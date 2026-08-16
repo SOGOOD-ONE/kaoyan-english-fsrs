@@ -85,8 +85,8 @@ def import_user_vocabulary(user):
         if not membership: db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
         response_words.append({"id": word.id, "word": word.word, "meaning": word.meaning, "type": word.word_type, "category": word.category})
 
-    if linked == 0:
-        db.session.rollback(); return jsonify({"error": "no_new_words", "vocabularyId": vocabulary.id}), 400
+    if linked == 0 and created_vocabulary:
+        db.session.rollback(); return jsonify({"error": "no_valid_words"}), 400
 
     selection = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary.id).first()
     if not selection:
@@ -94,7 +94,8 @@ def import_user_vocabulary(user):
     else:
         selection.enabled = True; selection.updated_at = datetime.utcnow()
     db.session.commit()
-    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "created": created_vocabulary, "words": response_words}), 201
+    status = 201 if created_vocabulary else 200
+    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "created": created_vocabulary, "words": response_words}), status
 
 @vocabulary_api.get("/study/available")
 @login_required
