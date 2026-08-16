@@ -4,22 +4,25 @@ import type { StoredCard, StoredReview, Word } from "../types";
 interface Schema extends DBSchema {
   words: { key: string; value: Word };
   cards: { key: string; value: StoredCard };
-  reviews: { key: string; value: StoredReview; indexes: { wordId: string; reviewedAt: number } };
+  reviews: { key: string; value: StoredReview; indexes: { wordId: string; reviewedAt: number; syncedAt: number } };
 }
 
 let dbPromise: Promise<IDBPDatabase<Schema>> | undefined;
 
 function db() {
-  if (!dbPromise) dbPromise = openDB<Schema>("kaoyan-fsrs", 2, {
+  if (!dbPromise) dbPromise = openDB<Schema>("kaoyan-fsrs", 3, {
     upgrade(database, oldVersion) {
       if (!database.objectStoreNames.contains("words")) database.createObjectStore("words", { keyPath: "id" });
       if (!database.objectStoreNames.contains("cards")) database.createObjectStore("cards", { keyPath: "wordId" });
       if (!database.objectStoreNames.contains("reviews")) {
         const reviews = database.createObjectStore("reviews", { keyPath: "id" });
-        reviews.createIndex("wordId", "wordId"); reviews.createIndex("reviewedAt", "reviewedAt");
+        reviews.createIndex("wordId", "wordId");
+        reviews.createIndex("reviewedAt", "reviewedAt");
+        reviews.createIndex("syncedAt", "syncedAt");
+      } else if (oldVersion < 3) {
+        const reviews = database.transaction.objectStore("reviews");
+        if (!reviews.indexNames.contains("syncedAt")) reviews.createIndex("syncedAt", "syncedAt");
       }
-      // v2 intentionally keeps existing data; future sync metadata can be added without resetting study history.
-      void oldVersion;
     }
   });
   return dbPromise;
@@ -34,6 +37,8 @@ export const store = {
   async getCards() { return (await db()).getAll("cards"); },
   async putReview(review: StoredReview) { return (await db()).put("reviews", review); },
   async getReviews(wordId?: string) { const database = await db(); return wordId ? database.getAllFromIndex("reviews", "wordId", wordId) : database.getAll("reviews"); },
+  async getPendingReviews() { const reviews = await (await db()).getAll("reviews"); return reviews.filter(review => !review.syncedAt).sort((a, b) => a.reviewedAt - b.reviewedAt); },
+  async markReviewSynced(id: string) { const database = await db(); const review = await database.get("reviews", id); if (!review) return; review.syncedAt = Date.now(); await database.put("reviews", review); },
   async clearCards() { const database = await db(); const tx = database.transaction("cards", "readwrite"); await tx.store.clear(); await tx.done; },
   async clearReviews() { const database = await db(); const tx = database.transaction("reviews", "readwrite"); await tx.store.clear(); await tx.done; }
 };
