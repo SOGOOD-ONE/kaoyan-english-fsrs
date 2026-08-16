@@ -52,7 +52,7 @@ export async function review(word: Word, rating: Grade, now = new Date()) {
   };
   await store.putReview(review);
   rememberReviewIdentity(review);
-  return result;
+  return { ...result, reviewId: review.id, reviewedAt: now.toISOString() };
 }
 
 export function getRetrievability(card: Card, now = new Date()) {
