@@ -40,6 +40,14 @@ def card_json(card):
 def normalize_word(value): return " ".join(str(value or "").strip().lower().split())
 
 
+def parse_client_datetime(value, fallback=None):
+    if not value: return fallback or datetime.utcnow()
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return fallback or datetime.utcnow()
+
+
 @api.get("/health")
 def health(): return jsonify({"ok": True})
 
@@ -107,7 +115,8 @@ def upsert_card(user, word_id):
     mapping = {"state": "state", "stability": "stability", "difficulty": "difficulty", "correctCount": "correct_count", "wrongCount": "wrong_count", "reviewCount": "review_count"}
     for key, attr in mapping.items():
         if key in data: setattr(card, attr, data[key])
-    if "dueAt" in data: card.due_at = datetime.fromisoformat(data["dueAt"].replace("Z", "+00:00")).replace(tzinfo=None)
+    if "dueAt" in data: card.due_at = parse_client_datetime(data["dueAt"])
+    if "lastReviewAt" in data: card.last_review_at = parse_client_datetime(data["lastReviewAt"])
     db.session.commit(); return jsonify(card_json(card))
 
 
@@ -145,28 +154,41 @@ def study_today(user):
 @api.post("/reviews")
 @login_required
 def create_review(user):
-    data = request.get_json(silent=True) or {}; word_id = str(data.get("wordId", "")); rating = int(data.get("rating", 0)); client_reviewed_at = data.get("reviewedAt"); review_id = str(data.get("reviewId", "")).strip()
+    data = request.get_json(silent=True) or {}
+    word_id = str(data.get("wordId", "")); rating = int(data.get("rating", 0)); review_id = str(data.get("reviewId", "")).strip()
     if rating not in (1, 2, 3, 4): return jsonify({"error": "invalid_rating"}), 400
+    if not word_id: return jsonify({"error": "word_required"}), 400
     if review_id:
         existing = ReviewLog.query.filter_by(id=review_id, user_id=user.id).first()
         if existing:
             existing_card_row = UserWordCard.query.filter_by(id=existing.card_id, user_id=user.id).first()
             return jsonify({"review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()}, "card": card_json(existing_card_row) if existing_card_row else None, "duplicate": True})
-    if client_reviewed_at:
-        try: reviewed_at = datetime.fromisoformat(str(client_reviewed_at).replace("Z", "+00:00")).replace(tzinfo=None)
-        except ValueError: reviewed_at = datetime.utcnow()
-    else: reviewed_at = datetime.utcnow()
+
+    reviewed_at = parse_client_datetime(data.get("reviewedAt"))
+    card_payload = data.get("card") if isinstance(data.get("card"), dict) else {}
     card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
     if not card:
         if not Word.query.filter_by(id=word_id).first(): return jsonify({"error": "word_not_found"}), 404
         card = UserWordCard(user_id=user.id, word_id=word_id, first_learned_at=reviewed_at); db.session.add(card); db.session.flush()
-    log = ReviewLog(id=review_id or None, user_id=user.id, word_id=word_id, card_id=card.id, rating=rating, review_type=str(data.get("reviewType", "review")), reviewed_at=reviewed_at, elapsed_seconds=data.get("elapsedSeconds"))
-    card.review_count += 1; card.last_review_at = reviewed_at
-    if rating == 1: card.wrong_count += 1
-    else: card.correct_count += 1
-    intervals = {1: 1, 2: 1, 3: 3, 4: 7}; card.state = "relearning" if rating == 1 else ("learning" if card.review_count == 1 else "review")
-    card.stability = max(1.0, card.stability * 1.35 + (rating - 2) * 0.35); card.difficulty = min(10.0, max(1.0, card.difficulty + {1: 1.0, 2: 0.4, 3: -0.2, 4: -0.4}[rating])); card.due_at = reviewed_at + timedelta(days=intervals[rating])
-    db.session.add(log); db.session.commit(); return jsonify({"review": {"id": log.id, "reviewedAt": reviewed_at.isoformat()}, "card": card_json(card)})
+
+    # The browser's FSRS scheduler is the source of truth. The server persists the
+    # resulting card state instead of applying a second, incompatible interval algorithm.
+    previous_review_count = card.review_count
+    card.review_count = int(card_payload.get("reviewCount", previous_review_count + 1))
+    card.correct_count = int(card_payload.get("correctCount", card.correct_count + (0 if rating == 1 else 1)))
+    card.wrong_count = int(card_payload.get("wrongCount", card.wrong_count + (1 if rating == 1 else 0)))
+    card.state = str(card_payload.get("state", card.state))
+    card.stability = float(card_payload.get("stability", card.stability))
+    card.difficulty = float(card_payload.get("difficulty", card.difficulty))
+    card.due_at = parse_client_datetime(card_payload.get("dueAt"), reviewed_at)
+    card.last_review_at = reviewed_at
+    if not card.first_learned_at: card.first_learned_at = reviewed_at
+
+    log = ReviewLog(id=review_id or None, user_id=user.id, word_id=word_id, card_id=card.id,
+                    rating=rating, review_type=str(data.get("reviewType", "review")), reviewed_at=reviewed_at,
+                    elapsed_seconds=data.get("elapsedSeconds"))
+    db.session.add(log); db.session.commit()
+    return jsonify({"review": {"id": log.id, "reviewedAt": reviewed_at.isoformat()}, "card": card_json(card)})
 
 
 @api.get("/vocabularies")
