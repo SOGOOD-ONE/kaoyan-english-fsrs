@@ -1,14 +1,12 @@
 import "./style.css";
 import { mount } from "./ui/app";
 import { syncStudyData } from "./services/sync";
+import { installSummaryObserver } from "./ui/summaryObserver";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app");
 
 async function bootstrap() {
-  // Restore cloud study state before rendering the learning queue.
-  // If the user is logged out or the server is temporarily unavailable,
-  // the offline-first local database remains usable.
   try {
     const me = await fetch("/api/auth/me", { credentials: "include" }).then(r => r.ok ? r.json() : null);
     if (me?.user) {
@@ -18,6 +16,7 @@ async function bootstrap() {
     console.warn("Auth check skipped:", error);
   }
 
+  installSummaryObserver(root);
   await mount(root);
 }
 
