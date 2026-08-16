@@ -1,10 +1,13 @@
 import { createEmptyCard, Rating, State, type Card, type Grade, type ReviewLog } from "ts-fsrs";
 import { scheduler } from "./config";
 import { store } from "../db/db";
+import { startReviewSync } from "../services/reviewSync";
 import type { StoredReview, Word } from "../types";
 
 export { Rating, State };
 export type { Grade };
+
+startReviewSync();
 
 function reviveCard(card: Card): Card {
   const c = structuredClone(card);
