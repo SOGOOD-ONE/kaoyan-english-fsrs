@@ -4,13 +4,13 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-COPY requirements.txt ./
+COPY backend/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
-COPY scripts ./scripts
-COPY ../data ./data
-COPY ../*.xlsx ./
+COPY backend/app ./app
+COPY backend/scripts ./scripts
+COPY backend/run.py ./run.py
+COPY *.xlsx ./
 
 ENV PORT=5000
 EXPOSE 5000
