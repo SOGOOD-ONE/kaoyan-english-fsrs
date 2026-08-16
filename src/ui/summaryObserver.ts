@@ -1,4 +1,4 @@
-import { showStudySummary } from "./studySummary";
+import { renderStudyComplete } from "./studyComplete";
 
 export function installSummaryObserver(root: HTMLElement) {
   const observer = new MutationObserver(() => {
@@ -8,7 +8,10 @@ export function installSummaryObserver(root: HTMLElement) {
     const match = empty.textContent.match(/(\d+)\s*\/\s*(\d+)/);
     if (!match) return;
     empty.dataset.summaryShown = "1";
-    void showStudySummary(root, Number(match[2]));
+    const modeLabel = root.querySelector<HTMLElement>("#session-label")?.textContent || "今日学习";
+    const completed = Number(match[1]);
+    const total = Number(match[2]);
+    void renderStudyComplete(root.querySelector<HTMLElement>("#card") || root, completed, total, modeLabel);
   });
   observer.observe(root, { subtree: true, childList: true, characterData: true });
   return observer;
