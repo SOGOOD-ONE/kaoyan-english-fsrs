@@ -17,6 +17,9 @@ let vocabularySelections: Record<string, boolean> = {};
 let vocabularies: VocabularySummary[] = [];
 let selectedWordIds: Set<string> | null = null;
 let answerVisible = false;
+let sessionAnswered = 0;
+let sessionTotal = 0;
+let sessionKey = "";
 
 type VocabularySummary = { id: string; name: string; kind: string; priority: number; description?: string; wordCount?: number; selected?: boolean };
 
@@ -59,8 +62,8 @@ function renderShell(root: HTMLElement) {
   document.getElementById("login")?.addEventListener("click", showAuth);
   document.getElementById("logout")?.addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }).catch(() => undefined); me = null; await loadVocabularyState(); renderShell(root); await render(); installKeyboardShortcuts(); });
   document.getElementById("vocab-manage")!.addEventListener("click", toggleVocabularyPanel);
-  document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => { quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota)); syncControls(); await render(); }));
-  document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); answerVisible = false; syncControls(); await render(); }));
+  document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => { quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota)); resetSession(); syncControls(); await render(); }));
+  document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); resetSession(); answerVisible = false; syncControls(); await render(); }));
 }
 
 async function toggleVocabularyPanel() { if (!me) { showAuth(); return; } const panel = document.getElementById("vocab-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderVocabularyPanel(); }
@@ -70,7 +73,7 @@ async function renderVocabularyPanel() {
   if (!vocabularies.length) { panel.innerHTML = `<div class="empty"><h2>还没有可用词库</h2><p>请先导入词库或等待系统词库部署。</p></div>`; return; }
   const stats = await Promise.all(vocabularies.map(async v => { try { return await api<{ wordCount: number; learned: number; due: number; new: number; masteryRate: number }>(`/vocabularies/${v.id}/stats`); } catch { return { wordCount: v.wordCount || 0, learned: 0, due: 0, new: v.wordCount || 0, masteryRate: 0 }; } }));
   panel.innerHTML = `<div class="vocab-head"><div><strong>我的词库</strong><span>选择后，今日新词只从启用的词库中抽取</span></div></div><div class="vocab-list">${vocabularies.map((v, i) => { const s = stats[i]; return `<div class="vocab-item"><div class="vocab-info"><label><input type="checkbox" data-vocab="${v.id}" ${v.selected ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><small>${escapeHtml(v.description || "系统词库")} · ${s.wordCount} 词</small><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><b>${s.masteryRate}%</b></div>`; }).join("")}</div>`;
-  panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await loadVocabularyState(); await renderVocabularyPanel(); await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
+  panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await loadVocabularyState(); resetSession(); await renderVocabularyPanel(); await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
 }
 
 function showAuth() {
@@ -78,12 +81,14 @@ function showAuth() {
   api<{ user: { id: string; email: string; nickname: string } }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }).then(result => { me = result.user; location.reload(); }).catch(async error => { if (error.message !== "invalid_credentials") { alert(error.message); return; } try { const result = await api<{ user: { id: string; email: string; nickname: string } }>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, nickname }) }); me = result.user; location.reload(); } catch (registerError) { alert(registerError instanceof Error ? registerError.message : "登录失败"); } });
 }
 
+function resetSession() { sessionAnswered = 0; sessionTotal = 0; sessionKey = ""; }
+function getSessionKey() { return `${new Date().toISOString().slice(0, 10)}:${mode}:${quota}:${Array.from(selectedWordIds || []).sort().join(",")}`; }
+function syncSession(total: number) { const key = getSessionKey(); if (sessionKey !== key) { sessionKey = key; sessionAnswered = Number(localStorage.getItem(`session:${key}`) || 0); sessionTotal = total; } else { sessionTotal = total; } }
+function markAnswered() { sessionAnswered += 1; localStorage.setItem(`session:${sessionKey}`, String(sessionAnswered)); }
+
 function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.classList.toggle("active", Number(b.dataset.quota) === quota)); document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode)); }
 
-function installKeyboardShortcuts() {
-  document.removeEventListener("keydown", handleKeydown);
-  document.addEventListener("keydown", handleKeydown);
-}
+function installKeyboardShortcuts() { document.removeEventListener("keydown", handleKeydown); document.addEventListener("keydown", handleKeydown); }
 
 function handleKeydown(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null;
@@ -99,6 +104,7 @@ async function submitRating(rating: Grade) {
   const word = current.word;
   await review(word, rating);
   try { await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId: word.id, rating, reviewType: mode, reviewId: crypto.randomUUID(), reviewedAt: new Date().toISOString() }) }); } catch { }
+  markAnswered();
   answerVisible = false;
   await render();
 }
@@ -106,19 +112,23 @@ async function submitRating(rating: Grade) {
 async function render() {
   const [allNew, allMandatory, allSelf, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
   const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf), rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
+  const total = mode === "new" ? Math.min(quota, newRows.length) : rows.length;
+  syncSession(total);
+  const remaining = Math.max(0, total - sessionAnswered);
   document.getElementById("stats")!.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
-  current = rows[0];
-  if (!current) { answerVisible = false; const message = me && selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? `今天的 ${quota} 个新词已经完成。` : mode === "mandatory" ? "昨天背过的词已经全部复习。" : "目前没有需要自主复习的词。"; document.getElementById("card")!.innerHTML = `<div class="empty"><h2>这一组完成了</h2><p>${message}</p></div>`; return; }
-  answerVisible = false;
-  renderCurrentCard();
+  current = remaining > 0 ? rows[0] : undefined;
+  const cardEl = document.getElementById("card")!;
+  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (me && selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? `今天没有可用的新词。` : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
+  renderCurrentCard(remaining, total);
 }
 
-function renderCurrentCard() {
+function renderCurrentCard(remaining?: number, total?: number) {
   const cardEl = document.getElementById("card"); if (!cardEl || !current) return;
   const options = preview(current.card), w = current.word;
+  const progress = remaining !== undefined && total !== undefined ? `<div class="session-progress"><span>本轮进度</span><strong>${Math.min(sessionAnswered + 1, total)} / ${total}</strong></div>` : "";
   const answer = answerVisible ? `<div class="answer"><p class="meaning">${escapeHtml(w.meaning)}</p>${w.example ? `<p class="example">${escapeHtml(w.example)}</p>` : ""}</div>` : `<button id="show-answer" class="show-answer">查看释义 <small>Space</small></button>`;
   const ratings = answerVisible ? `<div class="ratings">${reviewRatings.map((r, i) => `<button class="rating" data-rating="${r}"><strong>${ratingNames[r]}</strong><small>${i + 1} · ${stateName(options[r].card.state)} · ${formatInterval(options[r].card.due)}</small></button>`).join("")}</div>` : "";
-  cardEl.innerHTML = `<div class="word-card"><div class="progress">${mode === "new" ? "今日新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type || "")}</span><span>${escapeHtml(w.category || "")}</span></div>${answer}${ratings}</div>`;
+  cardEl.innerHTML = `<div class="word-card">${progress}<div class="progress">${mode === "new" ? "今日新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type || "")}</span><span>${escapeHtml(w.category || "")}</span></div>${answer}${ratings}</div>`;
   document.getElementById("show-answer")?.addEventListener("click", showAnswer);
   cardEl.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(b => b.addEventListener("click", () => void submitRating(Number(b.dataset.rating) as Grade)));
 }
