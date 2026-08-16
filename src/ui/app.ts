@@ -61,7 +61,11 @@ async function loadVocabularyState() {
   } catch { vocabularies = []; vocabularySelections = {}; selectedWordIds = null; }
 }
 
-function filterSelected(rows: Recommendation[]) { if (!me || selectedWordIds === null) return rows; return rows.filter(r => !!r.word.id && selectedWordIds.has(r.word.id)); }
+function filterSelected(rows: Recommendation[]) {
+  if (!me || selectedWordIds === null) return rows;
+  const ids = selectedWordIds;
+  return rows.filter(r => !!r.word.id && ids.has(r.word.id));
+}
 
 function renderShell(root: HTMLElement) {
   root.innerHTML = `<main class="shell home-shell"><header class="home-header"><div class="home-brand"><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="home-header-right">${studyNav("/")}<div class="home-account">${me ? `<span>你好，${escapeHtml(me.nickname)}</span><button id="logout" class="nav-quiet">退出</button>` : `<a href="/login" class="nav-quiet">登录</a>`}</div></div></header><section class="today-head"><div><span class="eyebrow">${me ? "今日学习" : "开始学习"}</span><h2>${me ? "继续你的记忆训练" : "建立你的考研英语词汇系统"}</h2><p>${me ? "先主动回忆，再查看释义，最后进行 FSRS 评分。" : "登录后即可保存学习进度、同步词库，并开始智能复习。"}</p></div><div class="today-actions">${me ? `<button id="vocab-manage">词库</button><button id="history-manage">历史</button><button id="settings-manage">设置</button>` : `<a class="primary-cta" href="/login">登录开始学习</a>`}</div></section><section class="today-overview panel"><div class="today-overview-main"><strong id="session-label">今日背诵</strong><span id="session-count">0 / 0</span></div><div class="today-stats" id="stats"></div></section><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel study-card-panel" id="card"></section><section class="home-tools"><button id="export">导出数据</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></section><section id="vocab-panel" class="panel vocab-panel" hidden></section><section id="history-panel" class="panel history-panel" hidden></section></main>`;
@@ -128,7 +132,7 @@ async function render() {
   statsEl.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
   current = remaining > 0 ? rows[0] : undefined;
   const cardEl = document.getElementById("card")!;
-  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds !== null && selectedWordIds.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
+  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
   sessionCount.textContent = `${Math.min(sessionAnswered + 1, total)} / ${total}`; renderCurrentCard(remaining, total);
 }
 
@@ -142,4 +146,4 @@ function renderCurrentCard(remaining?: number, total?: number) {
 }
 
 function formatInterval(date: Date) { const hours = Math.max(0, Math.round((date.getTime() - Date.now()) / 3600000)); if (hours < 24) return `${Math.max(1, hours)}小时后`; return `${Math.ceil(hours / 24)}天后`; }
-function escapeHtml(value: string) { return value.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch]!)); }
+function escapeHtml(value: string) { return value.replace(/[&<>\"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch]!)); }
