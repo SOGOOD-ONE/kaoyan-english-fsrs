@@ -60,8 +60,15 @@ def import_user_vocabulary(user):
     name = str(data.get("name", "")).strip() or "我的词库"
     words = data.get("words", [])
     if not isinstance(words, list) or len(words) == 0: return jsonify({"error": "words_required"}), 400
-    vocabulary = Vocabulary(name=name, owner_user_id=user.id, kind="user", priority=50, description="用户导入词库")
-    db.session.add(vocabulary); db.session.flush()
+
+    vocabulary = Vocabulary.query.filter_by(owner_user_id=user.id, kind="user", name=name).first()
+    created_vocabulary = False
+    if not vocabulary:
+        vocabulary = Vocabulary(name=name, owner_user_id=user.id, kind="user", priority=50, description="用户导入词库")
+        db.session.add(vocabulary); db.session.flush(); created_vocabulary = True
+    else:
+        vocabulary.description = "用户导入词库"
+
     inserted = updated = linked = 0; seen = set(); response_words = []
     for item in words:
         if not isinstance(item, dict): continue
@@ -77,10 +84,17 @@ def import_user_vocabulary(user):
         membership = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id, word_id=word.id).first()
         if not membership: db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
         response_words.append({"id": word.id, "word": word.word, "meaning": word.meaning, "type": word.word_type, "category": word.category})
+
     if linked == 0:
-        db.session.rollback(); return jsonify({"error": "no_valid_words"}), 400
-    db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50)); db.session.commit()
-    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "words": response_words}), 201
+        db.session.rollback(); return jsonify({"error": "no_new_words", "vocabularyId": vocabulary.id}), 400
+
+    selection = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary.id).first()
+    if not selection:
+        db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50))
+    else:
+        selection.enabled = True; selection.updated_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "created": created_vocabulary, "words": response_words}), 201
 
 @vocabulary_api.get("/study/available")
 @login_required
