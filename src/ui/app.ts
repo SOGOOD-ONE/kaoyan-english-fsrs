@@ -110,7 +110,7 @@ async function renderVocabularyPanel() {
 
 function resetSession() { sessionAnswered = 0; sessionTotal = 0; sessionKey = ""; }
 function getSessionKey() { return `${new Date().toISOString().slice(0, 10)}:${mode}:${quota}:${Array.from(selectedWordIds || []).sort().join(",")}`; }
-function syncSession(total: number) { const key = getSessionKey(); if (sessionKey !== key) { sessionKey = key; sessionAnswered = Number(localStorage.getItem(`session:${key}`) || 0); sessionTotal = total; } else { sessionTotal = total; } }
+function syncSession(total: number) { const key = getSessionKey(); if (sessionKey !== key) { sessionKey = key; sessionAnswered = Number(localStorage.getItem(`session:${key}`) || 0); sessionTotal = total; } }
 function markAnswered() { sessionAnswered += 1; localStorage.setItem(`session:${sessionKey}`, String(sessionAnswered)); }
 function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.classList.toggle("active", Number(b.dataset.quota) === quota)); document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode)); }
 function installKeyboardShortcuts() { document.removeEventListener("keydown", handleKeydown); document.addEventListener("keydown", handleKeydown); }
@@ -125,15 +125,17 @@ async function render() {
   const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf);
   const rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
   const total = mode === "new" ? Math.min(quota, newRows.length) : rows.length;
-  syncSession(total); const remaining = Math.max(0, total - sessionAnswered);
+  syncSession(total);
+  const totalForDisplay = sessionTotal;
+  const remaining = Math.max(0, totalForDisplay - sessionAnswered);
   const statsEl = document.getElementById("stats")!; const modeLabel = mode === "new" ? "今日背诵" : mode === "mandatory" ? "强制复习" : "自主复习";
   const sessionLabel = document.getElementById("session-label")!; const sessionCount = document.getElementById("session-count")!;
-  sessionLabel.textContent = modeLabel; sessionCount.textContent = `${Math.min(sessionAnswered, total)} / ${total}`;
+  sessionLabel.textContent = modeLabel; sessionCount.textContent = `${Math.min(sessionAnswered, totalForDisplay)} / ${totalForDisplay}`;
   statsEl.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
   current = remaining > 0 ? rows[0] : undefined;
   const cardEl = document.getElementById("card")!;
-  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
-  sessionCount.textContent = `${Math.min(sessionAnswered + 1, total)} / ${total}`; renderCurrentCard(remaining, total);
+  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${totalForDisplay ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${totalForDisplay ? `今日已完成 ${Math.min(sessionAnswered, totalForDisplay)} / ${totalForDisplay}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
+  sessionCount.textContent = `${Math.min(sessionAnswered + 1, totalForDisplay)} / ${totalForDisplay}`; renderCurrentCard(remaining, totalForDisplay);
 }
 
 function renderCurrentCard(remaining?: number, total?: number) {
