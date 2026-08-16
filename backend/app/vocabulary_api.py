@@ -62,37 +62,25 @@ def import_user_vocabulary(user):
     if not isinstance(words, list) or len(words) == 0: return jsonify({"error": "words_required"}), 400
     vocabulary = Vocabulary(name=name, owner_user_id=user.id, kind="user", priority=50, description="用户导入词库")
     db.session.add(vocabulary); db.session.flush()
-    inserted = updated = linked = 0
-    seen = set()
+    inserted = updated = linked = 0; seen = set(); response_words = []
     for item in words:
         if not isinstance(item, dict): continue
-        raw = str(item.get("word", "")).strip()
-        normalized = " ".join(raw.lower().split())
+        raw = str(item.get("word", "")).strip(); normalized = " ".join(raw.lower().split())
         if not normalized or normalized in seen: continue
         seen.add(normalized)
         word = Word.query.filter_by(normalized_word=normalized).first()
-        values = {
-            "word_type": str(item.get("type", item.get("wordType", "")) or "").strip(),
-            "meaning": str(item.get("meaning", "") or "").strip(),
-            "category": str(item.get("category", "") or "").strip(),
-            "source": "user_import",
-            "source_detail": name,
-        }
+        values = {"word_type": str(item.get("type", item.get("wordType", "")) or "").strip(), "meaning": str(item.get("meaning", "") or "").strip(), "category": str(item.get("category", "") or "").strip(), "source": "user_import", "source_detail": name}
         if word:
-            word.word_type = values["word_type"] or word.word_type
-            word.meaning = values["meaning"] or word.meaning
-            word.category = values["category"] or word.category
-            updated += 1
+            word.word_type = values["word_type"] or word.word_type; word.meaning = values["meaning"] or word.meaning; word.category = values["category"] or word.category; updated += 1
         else:
-            word = Word(word=raw, normalized_word=normalized, **values)
-            db.session.add(word); db.session.flush(); inserted += 1
-        db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
+            word = Word(word=raw, normalized_word=normalized, **values); db.session.add(word); db.session.flush(); inserted += 1
+        membership = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id, word_id=word.id).first()
+        if not membership: db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
+        response_words.append({"id": word.id, "word": word.word, "meaning": word.meaning, "type": word.word_type, "category": word.category})
     if linked == 0:
         db.session.rollback(); return jsonify({"error": "no_valid_words"}), 400
-    db.session.commit()
-    selection = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50)
-    db.session.add(selection); db.session.commit()
-    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked}), 201
+    db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50)); db.session.commit()
+    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "words": response_words}), 201
 
 @vocabulary_api.get("/study/available")
 @login_required
