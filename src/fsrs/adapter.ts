@@ -13,6 +13,18 @@ function reviveCard(card: Card): Card {
   return c;
 }
 
+function rememberReviewIdentity(review: StoredReview) {
+  try {
+    const key = "fsrs-review-identities";
+    const rows = JSON.parse(localStorage.getItem(key) || "[]") as Array<{ id: string; wordId: string; reviewedAt: number }>;
+    rows.push({ id: review.id, wordId: review.wordId, reviewedAt: review.reviewedAt });
+    const trimmed = rows.slice(-200);
+    localStorage.setItem(key, JSON.stringify(trimmed));
+  } catch {
+    // Storage is optional; IndexedDB remains the source of local review data.
+  }
+}
+
 export async function getCard(wordId: string): Promise<Card> {
   const saved = await store.getCard(wordId);
   if (saved) return reviveCard(saved.card);
@@ -39,6 +51,7 @@ export async function review(word: Word, rating: Grade, now = new Date()) {
     log: result.log
   };
   await store.putReview(review);
+  rememberReviewIdentity(review);
   return result;
 }
 
