@@ -48,10 +48,7 @@ async function loadVocabularyState() {
   } catch { vocabularies = []; vocabularySelections = {}; selectedWordIds = null; }
 }
 
-function filterSelected(rows: Recommendation[]) {
-  if (!me || selectedWordIds === null) return rows;
-  return rows.filter(r => !!r.word.id && selectedWordIds.has(r.word.id));
-}
+function filterSelected(rows: Recommendation[]) { if (!me || selectedWordIds === null) return rows; return rows.filter(r => !!r.word.id && selectedWordIds.has(r.word.id)); }
 
 function renderShell(root: HTMLElement) {
   root.innerHTML = `<main class="shell"><header><div><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="actions"><span id="user-area">${me ? `你好，${escapeHtml(me.nickname)} <button id="logout">退出</button>` : `<button id="login">登录 / 注册</button>`}</span><button id="vocab-manage">我的词库</button><button id="export">导出</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div></header><section id="vocab-panel" class="panel vocab-panel" hidden></section><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel"><div class="stats" id="stats"></div></section><section class="panel" id="card"></section></main>`;
@@ -64,12 +61,7 @@ function renderShell(root: HTMLElement) {
   document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); syncControls(); await render(); }));
 }
 
-async function toggleVocabularyPanel() {
-  if (!me) { showAuth(); return; }
-  const panel = document.getElementById("vocab-panel")!;
-  panel.hidden = !panel.hidden;
-  if (!panel.hidden) await renderVocabularyPanel();
-}
+async function toggleVocabularyPanel() { if (!me) { showAuth(); return; } const panel = document.getElementById("vocab-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderVocabularyPanel(); }
 
 async function renderVocabularyPanel() {
   const panel = document.getElementById("vocab-panel")!;
@@ -80,21 +72,15 @@ async function renderVocabularyPanel() {
 }
 
 function showAuth() {
-  const email = prompt("邮箱"); if (!email) return;
-  const password = prompt("密码（至少 8 位）"); if (!password) return;
-  const nickname = prompt("昵称（注册时填写，已有账号可直接回车）") || "考研用户";
-  api<{ user: { id: string; email: string; nickname: string } }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }).then(result => { me = result.user; location.reload(); }).catch(async error => {
-    if (error.message !== "invalid_credentials") { alert(error.message); return; }
-    try { const result = await api<{ user: { id: string; email: string; nickname: string } }>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, nickname }) }); me = result.user; location.reload(); } catch (registerError) { alert(registerError instanceof Error ? registerError.message : "登录失败"); }
-  });
+  const email = prompt("邮箱"); if (!email) return; const password = prompt("密码（至少 8 位）"); if (!password) return; const nickname = prompt("昵称（注册时填写，已有账号可直接回车）") || "考研用户";
+  api<{ user: { id: string; email: string; nickname: string } }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }).then(result => { me = result.user; location.reload(); }).catch(async error => { if (error.message !== "invalid_credentials") { alert(error.message); return; } try { const result = await api<{ user: { id: string; email: string; nickname: string } }>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, nickname }) }); me = result.user; location.reload(); } catch (registerError) { alert(registerError instanceof Error ? registerError.message : "登录失败"); } });
 }
 
 function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.classList.toggle("active", Number(b.dataset.quota) === quota)); document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode)); }
 
 async function render() {
   const [allNew, allMandatory, allSelf, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
-  const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf);
-  const rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
+  const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf), rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
   document.getElementById("stats")!.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
   const cardEl = document.getElementById("card")!; current = rows[0];
   if (!current) { const message = me && selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? `今天的 ${quota} 个新词已经完成。` : mode === "mandatory" ? "昨天背过的词已经全部复习。" : "目前没有需要自主复习的词。"; cardEl.innerHTML = `<div class="empty"><h2>这一组完成了</h2><p>${message}</p></div>`; return; }
