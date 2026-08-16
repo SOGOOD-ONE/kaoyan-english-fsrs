@@ -2,12 +2,14 @@ import { createEmptyCard, Rating, State, type Card, type Grade, type ReviewLog }
 import { scheduler } from "./config";
 import { store } from "../db/db";
 import { startReviewSync } from "../services/reviewSync";
+import { restoreCloudStudyState } from "../services/studyRestore";
 import type { StoredReview, Word } from "../types";
 
 export { Rating, State };
 export type { Grade };
 
 startReviewSync();
+void restoreCloudStudyState().catch(() => undefined);
 
 function reviveCard(card: Card): Card {
   const c = structuredClone(card);
