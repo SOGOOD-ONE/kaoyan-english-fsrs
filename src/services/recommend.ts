@@ -1,3 +1,18 @@
-import type {Card} from "ts-fsrs";import {getCard,getRetrievability,isDue} from "../fsrs/adapter";import {store} from "../db/db";import type {Word} from "../types";
-export type Recommendation={word:Word;card:Card;retrievability:number};
-export async function getDueRecommendations(limit=20){const words=await store.getWords();const rows:Recommendation[]=[];for(const word of words){const card=await getCard(word.id);if(isDue(card))rows.push({word,card,retrievability:getRetrievability(card)});}rows.sort((a,b)=>(Date.now()-b.card.due.getTime())-(Date.now()-a.card.due.getTime()));return rows.slice(0,limit);}
+import type { Card } from "ts-fsrs";
+import { getCard, getRetrievability, isDue } from "../fsrs/adapter";
+import { store } from "../db/db";
+import type { Word } from "../types";
+
+export type Recommendation = { word: Word; card: Card; retrievability: number };
+
+export async function getDueRecommendations(limit = 20) {
+  const words = await store.getWords();
+  const rows: Recommendation[] = [];
+  for (const word of words) {
+    if (!word.id) continue;
+    const card = await getCard(word.id);
+    if (isDue(card)) rows.push({ word, card, retrievability: getRetrievability(card) });
+  }
+  rows.sort((a, b) => (Date.now() - b.card.due.getTime()) - (Date.now() - a.card.due.getTime()));
+  return rows.slice(0, limit);
+}
