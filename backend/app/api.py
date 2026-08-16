@@ -115,6 +115,22 @@ def sync_study(user):
     return jsonify({"cards": [card_json(c) for c in cards], "reviews": [{"id": r.id, "wordId": r.word_id, "rating": r.rating, "reviewedAt": r.reviewed_at.isoformat(), "reviewType": r.review_type} for r in logs]})
 
 
+@api.get("/study/stats")
+@login_required
+def study_stats(user):
+    today = date.today(); start = datetime.combine(today, datetime.min.time()); end = start + timedelta(days=1)
+    logs = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= start, ReviewLog.reviewed_at < end).all()
+    counts = {1: 0, 2: 0, 3: 0, 4: 0}
+    for log in logs: counts[log.rating] = counts.get(log.rating, 0) + 1
+    cards = UserWordCard.query.filter_by(user_id=user.id).all()
+    return jsonify({
+        "date": today.isoformat(), "totalReviews": len(logs),
+        "again": counts[1], "hard": counts[2], "good": counts[3], "easy": counts[4],
+        "learnedWords": len([c for c in cards if c.review_count > 0]),
+        "dueWords": len([c for c in cards if c.review_count > 0 and c.due_at <= datetime.utcnow()]),
+    })
+
+
 @api.get("/words")
 @login_required
 def words(user):
