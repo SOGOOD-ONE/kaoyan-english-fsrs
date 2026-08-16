@@ -1,3 +1,5 @@
+import { apiRequest } from "./api";
+
 export type HistoryDay = {
   date: string;
   totalReviews: number;
@@ -17,7 +19,5 @@ export type HistoryResponse = {
 };
 
 export async function getStudyHistory(days = 30): Promise<HistoryResponse> {
-  const response = await fetch(`/api/history?days=${Math.max(1, Math.min(days, 365))}`, { credentials: "include" });
-  if (!response.ok) throw new Error("history_unavailable");
-  return response.json();
+  return apiRequest<HistoryResponse>(`/history?days=${Math.max(1, Math.min(days, 365))}`);
 }
