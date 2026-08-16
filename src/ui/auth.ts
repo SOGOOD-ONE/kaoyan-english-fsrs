@@ -1,11 +1,11 @@
 import { apiRequest } from "../services/api";
+import { appPath } from "../main";
 
 type AuthResult = { user: { id: string; email: string; nickname: string } };
 
 export async function mountAuth(root: HTMLElement, initialMode: "login" | "register" = "login") {
   let mode: "login" | "register" = initialMode;
   root.innerHTML = `<main class="auth-page"><section class="auth-card"><div class="auth-brand"><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="auth-tabs"><button id="login-tab" class="${mode === "login" ? "active" : ""}">登录</button><button id="register-tab" class="${mode === "register" ? "active" : ""}">注册</button></div><form id="auth-form"><label><span>邮箱</span><input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com"></label><label><span>密码</span><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label><label id="nickname-row" ${mode === "register" ? "" : "hidden"}><span>昵称</span><input id="auth-nickname" type="text" maxlength="80" placeholder="考研用户"></label><button class="auth-submit" type="submit" id="auth-submit">${mode === "login" ? "登录" : "创建账号"}</button><p class="auth-status" id="auth-status"></p></form></section></main>`;
-
   const form = document.getElementById("auth-form") as HTMLFormElement;
   const nicknameRow = document.getElementById("nickname-row")!;
   const submit = document.getElementById("auth-submit")!;
@@ -21,7 +21,7 @@ export async function mountAuth(root: HTMLElement, initialMode: "login" | "regis
     submit.setAttribute("disabled", "true");
     try {
       await apiRequest<AuthResult>(mode === "login" ? "/auth/login" : "/auth/register", { method: "POST", body: JSON.stringify(mode === "login" ? { email, password } : { email, password, nickname }) });
-      location.href = "/";
+      location.href = appPath("/");
     } catch (error) {
       const code = error instanceof Error ? error.message : "auth_failed";
       const messages: Record<string, string> = { invalid_credentials: "邮箱或密码不正确", email_exists: "这个邮箱已经注册", invalid_email: "请输入有效邮箱", password_too_short: "密码至少需要 8 位" };
