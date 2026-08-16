@@ -1,14 +1,12 @@
 import { apiRequest } from "../services/api";
+import { renderNav } from "./nav";
 
 type Vocabulary = { id: string; name: string; kind: string; priority: number; description?: string };
 type Selection = { vocabularyId: string; enabled: boolean; priority: number };
 type Stats = { wordCount: number; learned: number; due: number; new: number; masteryRate: number };
 
 export async function mountVocabularies(root: HTMLElement) {
-  root.innerHTML = `<main class="shell page"><header class="page-header"><div><h1>我的词库</h1><p>选择今天要学习的词库，也可以导入自己的词表</p></div><nav><button data-back>学习</button><button data-history>历史</button><button data-settings>设置</button></nav></header><section class="panel" id="vocab-page"></section></main>`;
-  root.querySelector("[data-back]")?.addEventListener("click", () => { location.href = "/"; });
-  root.querySelector("[data-history]")?.addEventListener("click", () => { location.href = "/history"; });
-  root.querySelector("[data-settings]")?.addEventListener("click", () => { location.href = "/settings"; });
+  root.innerHTML = `<main class="shell page"><header class="page-header"><div><h1>我的词库</h1><p>选择今天要学习的词库，也可以导入自己的词表</p></div>${renderNav("/vocabularies")}</header><section class="panel" id="vocab-page"></section></main>`;
   await renderList(root.querySelector("#vocab-page") as HTMLElement);
 }
 
@@ -40,7 +38,7 @@ async function parseFile(file: File): Promise<Array<Record<string, string>>> {
   if (name.endsWith(".csv")) { const text = await file.text(); const rows = text.split(/\r?\n/).filter(Boolean).map(line => line.split(",")); const headers = rows.shift() || []; return rows.map(row => Object.fromEntries(headers.map((h, i) => [h.trim(), row[i] ?? ""]))); }
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  return XLSX.utils.sheet_to_json<Array<Record<string, string>>>(sheet, { defval: "" }) as unknown as Array<Record<string, string>>;
+  return XLSX.utils.sheet_to_json(sheet, { defval: "" }) as Array<Record<string, string>>;
 }
 
 function escapeHtml(value: string) { return value.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch]!)); }
