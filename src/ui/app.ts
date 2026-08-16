@@ -128,7 +128,7 @@ async function render() {
   statsEl.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
   current = remaining > 0 ? rows[0] : undefined;
   const cardEl = document.getElementById("card")!;
-  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
+  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds !== null && selectedWordIds.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
   sessionCount.textContent = `${Math.min(sessionAnswered + 1, total)} / ${total}`; renderCurrentCard(remaining, total);
 }
 
