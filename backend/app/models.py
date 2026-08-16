@@ -34,8 +34,11 @@ class Word(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=uid)
     word = db.Column(db.String(255), nullable=False)
     normalized_word = db.Column(db.String(255), nullable=False, unique=True, index=True)
+    word_type = db.Column(db.String(40), nullable=False, default='')
     meaning = db.Column(db.Text, nullable=False, default='')
-    source = db.Column(db.String(100), default='system')
+    category = db.Column(db.String(60), nullable=False, default='')
+    source = db.Column(db.String(100), nullable=False, default='system')
+    source_detail = db.Column(db.String(255), nullable=False, default='')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -44,7 +47,9 @@ class Vocabulary(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=uid)
     name = db.Column(db.String(120), nullable=False)
     owner_user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), index=True)
-    kind = db.Column(db.String(20), nullable=False, default='user')  # system / user
+    kind = db.Column(db.String(20), nullable=False, default='user')
+    priority = db.Column(db.Integer, nullable=False, default=50)
+    description = db.Column(db.Text, nullable=False, default='')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -53,6 +58,7 @@ class VocabularyWord(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=uid)
     vocabulary_id = db.Column(db.String(36), db.ForeignKey('vocabularies.id', ondelete='CASCADE'), nullable=False, index=True)
     word_id = db.Column(db.String(36), db.ForeignKey('words.id', ondelete='CASCADE'), nullable=False, index=True)
+    priority = db.Column(db.Integer, nullable=False, default=50)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint('vocabulary_id', 'word_id', name='uq_vocab_word'),)
 
