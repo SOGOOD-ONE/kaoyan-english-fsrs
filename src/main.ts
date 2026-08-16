@@ -1,5 +1,6 @@
 import "./style.css";
 import { mount } from "./ui/app";
+import { mountSettings } from "./ui/settings";
 import { syncStudyData } from "./services/sync";
 import { installSummaryObserver } from "./ui/summaryObserver";
 import { apiRequest } from "./services/api";
@@ -8,6 +9,13 @@ const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app");
 
 async function bootstrap() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+
+  if (path === "/settings") {
+    await mountSettings(root);
+    return;
+  }
+
   try {
     const me = await apiRequest<{ user: unknown }>("/auth/me");
     if (me?.user) {
