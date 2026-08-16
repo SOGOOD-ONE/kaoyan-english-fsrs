@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/app ./app
 COPY backend/scripts ./scripts
 COPY backend/run.py ./run.py
+COPY data ./data
 COPY *.xlsx ./
 
 ENV PORT=5000
