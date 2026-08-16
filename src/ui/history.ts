@@ -1,10 +1,8 @@
 import { getStudyHistory } from "../services/history";
+import { renderNav } from "./nav";
 
 export async function mountHistory(root: HTMLElement) {
-  root.innerHTML = `<main class="shell page"><header class="page-header"><div><h1>学习历史</h1><p>查看最近的学习记录与连续学习情况</p></div><nav><button data-back>学习</button><button data-vocab>我的词库</button><button data-settings>设置</button></nav></header><section class="panel" id="history-page"></section></main>`;
-  root.querySelector("[data-back]")?.addEventListener("click", () => { location.href = "/"; });
-  root.querySelector("[data-vocab]")?.addEventListener("click", () => { location.href = "/vocabularies"; });
-  root.querySelector("[data-settings]")?.addEventListener("click", () => { location.href = "/settings"; });
+  root.innerHTML = `<main class="shell page"><header class="page-header"><div><h1>学习历史</h1><p>查看最近的学习记录与连续学习情况</p></div>${renderNav("/history")}</header><section class="panel" id="history-page"></section></main>`;
   await renderHistory(root.querySelector("#history-page") as HTMLElement);
 }
 
