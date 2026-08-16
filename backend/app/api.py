@@ -67,6 +67,11 @@ def register():
 
 
 @api.post("/auth/login")
+@login_required
+def login_required_placeholder(user): return jsonify({"error": "internal"}), 500
+
+
+@api.post("/auth/login")
 def login():
     data = request.get_json(silent=True) or {}; user = User.query.filter_by(email=str(data.get("email", "")).strip().lower()).first()
     if not user or not check_password_hash(user.password_hash, str(data.get("password", ""))) or user.status != "active": return jsonify({"error": "invalid_credentials"}), 401
@@ -164,18 +169,12 @@ def create_review(user):
         if existing:
             existing_card_row = UserWordCard.query.filter_by(id=existing.card_id, user_id=user.id).first()
             return jsonify({"review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()}, "card": card_json(existing_card_row) if existing_card_row else None, "duplicate": True})
-
-    reviewed_at = parse_client_datetime(data.get("reviewedAt"))
-    card_payload = data.get("card") if isinstance(data.get("card"), dict) else {}
+    reviewed_at = parse_client_datetime(data.get("reviewedAt")); card_payload = data.get("card") if isinstance(data.get("card"), dict) else {}
     card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
     if not card:
         if not Word.query.filter_by(id=word_id).first(): return jsonify({"error": "word_not_found"}), 404
         card = UserWordCard(user_id=user.id, word_id=word_id, first_learned_at=reviewed_at); db.session.add(card); db.session.flush()
-    previous_review_count = card.review_count
-    card.review_count = int(card_payload.get("reviewCount", previous_review_count + 1))
-    card.correct_count = int(card_payload.get("correctCount", card.correct_count + (0 if rating == 1 else 1)))
-    card.wrong_count = int(card_payload.get("wrongCount", card.wrong_count + (1 if rating == 1 else 0)))
-    card.state = str(card_payload.get("state", card.state)); card.stability = float(card_payload.get("stability", card.stability)); card.difficulty = float(card_payload.get("difficulty", card.difficulty)); card.due_at = parse_client_datetime(card_payload.get("dueAt"), reviewed_at); card.last_review_at = reviewed_at
+    previous_review_count = card.review_count; card.review_count = int(card_payload.get("reviewCount", previous_review_count + 1)); card.correct_count = int(card_payload.get("correctCount", card.correct_count + (0 if rating == 1 else 1))); card.wrong_count = int(card_payload.get("wrongCount", card.wrong_count + (1 if rating == 1 else 0)); card.state = str(card_payload.get("state", card.state)); card.stability = float(card_payload.get("stability", card.stability)); card.difficulty = float(card_payload.get("difficulty", card.difficulty)); card.due_at = parse_client_datetime(card_payload.get("dueAt"), reviewed_at); card.last_review_at = reviewed_at
     if not card.first_learned_at: card.first_learned_at = reviewed_at
     log = ReviewLog(id=review_id or None, user_id=user.id, word_id=word_id, card_id=card.id, rating=rating, review_type=str(data.get("reviewType", "review")), reviewed_at=reviewed_at, elapsed_seconds=data.get("elapsedSeconds"))
     db.session.add(log); db.session.commit(); return jsonify({"review": {"id": log.id, "reviewedAt": reviewed_at.isoformat()}, "card": card_json(card)})
@@ -193,8 +192,7 @@ def vocabularies(user):
 def vocabulary_detail(user, vocabulary_id):
     vocabulary = Vocabulary.query.filter_by(id=vocabulary_id).filter((Vocabulary.kind == "system") | (Vocabulary.owner_user_id == user.id)).first()
     if not vocabulary: return jsonify({"error": "not_found"}), 404
-    links = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).order_by(VocabularyWord.priority.desc(), VocabularyWord.created_at.asc()).all()
-    word_ids = [link.word_id for link in links]; word_map = {w.id: w for w in Word.query.filter(Word.id.in_(word_ids)).all()} if word_ids else {}
+    links = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).order_by(VocabularyWord.priority.desc(), VocabularyWord.created_at.asc()).all(); word_ids = [link.word_id for link in links]; word_map = {w.id: w for w in Word.query.filter(Word.id.in_(word_ids)).all()} if word_ids else {}
     return jsonify({"id": vocabulary.id, "name": vocabulary.name, "kind": vocabulary.kind, "priority": vocabulary.priority, "description": vocabulary.description, "wordCount": len(word_ids), "words": [{"id": w.id, "word": w.word, "type": w.word_type, "meaning": w.meaning, "category": w.category, "priority": link.priority} for link in links if (w := word_map.get(link.word_id))]})
 
 
@@ -203,8 +201,7 @@ def vocabulary_detail(user, vocabulary_id):
 def vocabulary_stats(user, vocabulary_id):
     vocabulary = Vocabulary.query.filter_by(id=vocabulary_id).filter((Vocabulary.kind == "system") | (Vocabulary.owner_user_id == user.id)).first()
     if not vocabulary: return jsonify({"error": "not_found"}), 404
-    word_ids = {link.word_id for link in VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).all()}
-    cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all() if word_ids else []
+    word_ids = {link.word_id for link in VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).all()}; cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all() if word_ids else []
     learned = [c for c in cards if c.review_count > 0]; due = [c for c in learned if c.due_at <= datetime.utcnow()]
     return jsonify({"vocabularyId": vocabulary.id, "wordCount": len(word_ids), "learned": len(learned), "due": len(due), "new": len(word_ids) - len(learned), "masteryRate": round(len([c for c in learned if c.state == "review"]) / len(word_ids) * 100, 1) if word_ids else 0})
 
