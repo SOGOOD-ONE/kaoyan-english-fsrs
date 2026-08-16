@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db
-from .models import DailyPlan, ReviewLog, User, UserSetting, UserWordCard, Vocabulary, VocabularyWord, Word
+from .models import DailyPlan, ReviewLog, User, UserSetting, UserVocabulary, UserWordCard, Vocabulary, VocabularyWord, Word
 
 api = Blueprint("api", __name__)
 
@@ -50,7 +50,10 @@ def register():
     if len(email) < 5 or "@" not in email: return jsonify({"error": "invalid_email"}), 400
     if len(password) < 8: return jsonify({"error": "password_too_short"}), 400
     if User.query.filter_by(email=email).first(): return jsonify({"error": "email_exists"}), 409
-    user = User(email=email, password_hash=generate_password_hash(password), nickname=nickname); db.session.add(user); db.session.flush(); db.session.add(UserSetting(user_id=user.id)); db.session.commit(); session.clear(); session["user_id"] = user.id
+    user = User(email=email, password_hash=generate_password_hash(password), nickname=nickname); db.session.add(user); db.session.flush(); db.session.add(UserSetting(user_id=user.id))
+    core = Vocabulary.query.filter_by(name="考研英语核心词", kind="system").first()
+    if core: db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=core.id, enabled=True, priority=core.priority))
+    db.session.commit(); session.clear(); session["user_id"] = user.id
     return jsonify({"user": user_json(user)}), 201
 
 
@@ -113,22 +116,6 @@ def upsert_card(user, word_id):
 def sync_study(user):
     cards = UserWordCard.query.filter_by(user_id=user.id).all(); logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
     return jsonify({"cards": [card_json(c) for c in cards], "reviews": [{"id": r.id, "wordId": r.word_id, "rating": r.rating, "reviewedAt": r.reviewed_at.isoformat(), "reviewType": r.review_type} for r in logs]})
-
-
-@api.get("/study/stats")
-@login_required
-def study_stats(user):
-    today = date.today(); start = datetime.combine(today, datetime.min.time()); end = start + timedelta(days=1)
-    logs = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= start, ReviewLog.reviewed_at < end).all()
-    counts = {1: 0, 2: 0, 3: 0, 4: 0}
-    for log in logs: counts[log.rating] = counts.get(log.rating, 0) + 1
-    cards = UserWordCard.query.filter_by(user_id=user.id).all()
-    return jsonify({
-        "date": today.isoformat(), "totalReviews": len(logs),
-        "again": counts[1], "hard": counts[2], "good": counts[3], "easy": counts[4],
-        "learnedWords": len([c for c in cards if c.review_count > 0]),
-        "dueWords": len([c for c in cards if c.review_count > 0 and c.due_at <= datetime.utcnow()]),
-    })
 
 
 @api.get("/words")
