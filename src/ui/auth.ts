@@ -2,9 +2,9 @@ import { apiRequest } from "../services/api";
 
 type AuthResult = { user: { id: string; email: string; nickname: string } };
 
-export async function mountAuth(root: HTMLElement) {
-  let mode: "login" | "register" = "login";
-  root.innerHTML = `<main class="auth-page"><section class="auth-card"><div class="auth-brand"><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="auth-tabs"><button id="login-tab" class="active">登录</button><button id="register-tab">注册</button></div><form id="auth-form"><label><span>邮箱</span><input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com"></label><label><span>密码</span><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label><label id="nickname-row" hidden><span>昵称</span><input id="auth-nickname" type="text" maxlength="80" placeholder="考研用户"></label><button class="auth-submit" type="submit" id="auth-submit">登录</button><p class="auth-status" id="auth-status"></p></form></section></main>`;
+export async function mountAuth(root: HTMLElement, initialMode: "login" | "register" = "login") {
+  let mode: "login" | "register" = initialMode;
+  root.innerHTML = `<main class="auth-page"><section class="auth-card"><div class="auth-brand"><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="auth-tabs"><button id="login-tab" class="${mode === "login" ? "active" : ""}">登录</button><button id="register-tab" class="${mode === "register" ? "active" : ""}">注册</button></div><form id="auth-form"><label><span>邮箱</span><input id="auth-email" type="email" autocomplete="email" required placeholder="name@example.com"></label><label><span>密码</span><input id="auth-password" type="password" autocomplete="current-password" minlength="8" required placeholder="至少 8 位"></label><label id="nickname-row" ${mode === "register" ? "" : "hidden"}><span>昵称</span><input id="auth-nickname" type="text" maxlength="80" placeholder="考研用户"></label><button class="auth-submit" type="submit" id="auth-submit">${mode === "login" ? "登录" : "创建账号"}</button><p class="auth-status" id="auth-status"></p></form></section></main>`;
 
   const form = document.getElementById("auth-form") as HTMLFormElement;
   const nicknameRow = document.getElementById("nickname-row")!;
