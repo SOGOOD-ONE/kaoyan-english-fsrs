@@ -2,13 +2,14 @@ import "./style.css";
 import { mount } from "./ui/app";
 import { syncStudyData } from "./services/sync";
 import { installSummaryObserver } from "./ui/summaryObserver";
+import { apiRequest } from "./services/api";
 
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app");
 
 async function bootstrap() {
   try {
-    const me = await fetch("/api/auth/me", { credentials: "include" }).then(r => r.ok ? r.json() : null);
+    const me = await apiRequest<{ user: unknown }>("/auth/me");
     if (me?.user) {
       try { await syncStudyData(); } catch (error) { console.warn("Cloud sync skipped:", error); }
     }
