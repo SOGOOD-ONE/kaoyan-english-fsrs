@@ -38,6 +38,28 @@ function serverCardToLocal(card: ServerCard): StoredCard {
   };
 }
 
+function remoteReviewToStored(remote: ServerReview, card: ServerCard | undefined): StoredReview {
+  const snapshot = card ? serverCardToLocal(card).card : ({
+    due: new Date(remote.reviewedAt),
+    stability: 0,
+    difficulty: 0,
+    state: State.New,
+    reps: 0,
+    lapses: 0,
+    learning_steps: 0,
+  } as Card);
+  return {
+    id: remote.id,
+    wordId: remote.wordId,
+    reviewedAt: new Date(remote.reviewedAt).getTime(),
+    rating: remote.rating as Rating,
+    log: {} as ReviewLog,
+    card: snapshot,
+    reviewType: remote.reviewType,
+    syncedAt: Date.now(),
+  };
+}
+
 /** Upload every local review first. The review UUID makes the endpoint idempotent. */
 export async function pushPendingReviews(): Promise<number> {
   const localReviews = await store.getReviews();
@@ -58,11 +80,10 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
   const server = await apiRequest<SyncResponse>("/sync/study");
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
+  const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
 
   for (const remote of server.reviews) {
-    if (!localById.has(remote.id)) {
-      await store.putReview({ id: remote.id, wordId: remote.wordId, reviewedAt: new Date(remote.reviewedAt).getTime(), rating: remote.rating as Rating, log: {} as ReviewLog });
-    }
+    if (!localById.has(remote.id)) await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
   }
 
   const localCards = await store.getCards();
@@ -79,23 +100,23 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
 }
 
 export async function uploadReview(review: StoredReview): Promise<void> {
-  const localCard = await store.getCard(review.wordId);
+  const localCard = review.card;
   await apiRequest("/reviews", {
     method: "POST",
     body: JSON.stringify({
       reviewId: review.id,
       wordId: review.wordId,
       rating: review.rating,
-      reviewType: "review",
+      reviewType: review.reviewType || "review",
       reviewedAt: new Date(review.reviewedAt).toISOString(),
       card: localCard ? {
-        state: localStateToServer(localCard.card.state),
-        stability: localCard.card.stability,
-        difficulty: localCard.card.difficulty,
-        dueAt: localCard.card.due.toISOString(),
-        reviewCount: localCard.card.reps,
-        wrongCount: localCard.card.lapses,
-        correctCount: Math.max(0, localCard.card.reps - localCard.card.lapses),
+        state: localStateToServer(localCard.state),
+        stability: localCard.stability,
+        difficulty: localCard.difficulty,
+        dueAt: localCard.due.toISOString(),
+        reviewCount: localCard.reps,
+        wrongCount: localCard.lapses,
+        correctCount: Math.max(0, localCard.reps - localCard.lapses),
       } : undefined,
     }),
   });
