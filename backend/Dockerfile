@@ -16,4 +16,4 @@ COPY *.xlsx ./
 ENV PORT=5000
 EXPOSE 5000
 
-CMD ["sh", "-c", "python scripts/bootstrap_vocabulary.py && gunicorn -b 0.0.0.0:${PORT} run:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5000", "run:app"]
