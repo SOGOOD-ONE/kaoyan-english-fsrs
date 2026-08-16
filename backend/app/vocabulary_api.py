@@ -53,6 +53,47 @@ def replace_selections(user):
         row.enabled = bool(item.get("enabled", False)); row.priority = max(0, min(int(item.get("priority", vocabulary.priority)), 1000)); row.updated_at = datetime.utcnow()
     db.session.commit(); return selections(user)
 
+@vocabulary_api.post("/vocabularies/import")
+@login_required
+def import_user_vocabulary(user):
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip() or "我的词库"
+    words = data.get("words", [])
+    if not isinstance(words, list) or len(words) == 0: return jsonify({"error": "words_required"}), 400
+    vocabulary = Vocabulary(name=name, owner_user_id=user.id, kind="user", priority=50, description="用户导入词库")
+    db.session.add(vocabulary); db.session.flush()
+    inserted = updated = linked = 0
+    seen = set()
+    for item in words:
+        if not isinstance(item, dict): continue
+        raw = str(item.get("word", "")).strip()
+        normalized = " ".join(raw.lower().split())
+        if not normalized or normalized in seen: continue
+        seen.add(normalized)
+        word = Word.query.filter_by(normalized_word=normalized).first()
+        values = {
+            "word_type": str(item.get("type", item.get("wordType", "")) or "").strip(),
+            "meaning": str(item.get("meaning", "") or "").strip(),
+            "category": str(item.get("category", "") or "").strip(),
+            "source": "user_import",
+            "source_detail": name,
+        }
+        if word:
+            word.word_type = values["word_type"] or word.word_type
+            word.meaning = values["meaning"] or word.meaning
+            word.category = values["category"] or word.category
+            updated += 1
+        else:
+            word = Word(word=raw, normalized_word=normalized, **values)
+            db.session.add(word); db.session.flush(); inserted += 1
+        db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
+    if linked == 0:
+        db.session.rollback(); return jsonify({"error": "no_valid_words"}), 400
+    db.session.commit()
+    selection = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50)
+    db.session.add(selection); db.session.commit()
+    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked}), 201
+
 @vocabulary_api.get("/study/available")
 @login_required
 def available_words(user):
@@ -62,6 +103,5 @@ def available_words(user):
     links = VocabularyWord.query.filter(VocabularyWord.vocabulary_id.in_(vocab_ids)).order_by(VocabularyWord.priority.desc(), VocabularyWord.created_at.asc()).all()
     unique_ids = list(dict.fromkeys(x.word_id for x in links)); words = Word.query.filter(Word.id.in_(unique_ids)).all() if unique_ids else []
     cards = {c.word_id: c for c in UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(unique_ids)).all()} if unique_ids else {}
-    order = {word_id: i for i, word_id in enumerate(unique_ids)}
-    words.sort(key=lambda w: order.get(w.id, 10**9))
+    order = {word_id: i for i, word_id in enumerate(unique_ids)}; words.sort(key=lambda w: order.get(w.id, 10**9))
     return jsonify({"vocabularies": [{"id": x.vocabulary_id, "priority": x.priority} for x in enabled], "wordCount": len(words), "newCount": sum(1 for w in words if w.id not in cards), "words": [{"id": w.id, "word": w.word, "type": w.word_type, "meaning": w.meaning, "category": w.category, "source": w.source, "reviewCount": cards[w.id].review_count if w.id in cards else 0} for w in words]})
