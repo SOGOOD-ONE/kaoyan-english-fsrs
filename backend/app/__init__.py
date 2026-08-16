@@ -18,14 +18,12 @@ def create_app() -> Flask:
     )
 
     db.init_app(app)
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": os.getenv("FRONTEND_ORIGIN", "*")}},
-        supports_credentials=True,
-    )
+    CORS(app, resources={r"/api/*": {"origins": os.getenv("FRONTEND_ORIGIN", "*")}}, supports_credentials=True)
 
     from .api import api
+    from .vocabulary_api import vocabulary_api
     app.register_blueprint(api, url_prefix="/api")
+    app.register_blueprint(vocabulary_api, url_prefix="/api")
 
     with app.app_context():
         from . import models  # noqa: F401
