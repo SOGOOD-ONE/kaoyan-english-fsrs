@@ -143,8 +143,11 @@ def study_today(user):
 @api.post("/reviews")
 @login_required
 def create_review(user):
-    data = request.get_json(silent=True) or {}; word_id = str(data.get("wordId", "")); rating = int(data.get("rating", 0)); client_reviewed_at = data.get("reviewedAt")
+    data = request.get_json(silent=True) or {}; word_id = str(data.get("wordId", "")); rating = int(data.get("rating", 0)); client_reviewed_at = data.get("reviewedAt"); review_id = str(data.get("reviewId", "")).strip()
     if rating not in (1, 2, 3, 4): return jsonify({"error": "invalid_rating"}), 400
+    if review_id:
+        existing = ReviewLog.query.filter_by(id=review_id, user_id=user.id).first()
+        if existing: return jsonify({"review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()}, "card": card_json(existing_card(existing)) if existing_card(existing) else None, "duplicate": True})
     if client_reviewed_at:
         try: reviewed_at = datetime.fromisoformat(str(client_reviewed_at).replace("Z", "+00:00")).replace(tzinfo=None)
         except ValueError: reviewed_at = datetime.utcnow()
@@ -153,13 +156,17 @@ def create_review(user):
     if not card:
         if not Word.query.filter_by(id=word_id).first(): return jsonify({"error": "word_not_found"}), 404
         card = UserWordCard(user_id=user.id, word_id=word_id, first_learned_at=reviewed_at); db.session.add(card); db.session.flush()
-    log = ReviewLog(user_id=user.id, word_id=word_id, card_id=card.id, rating=rating, review_type=str(data.get("reviewType", "review")), reviewed_at=reviewed_at, elapsed_seconds=data.get("elapsedSeconds"))
+    log = ReviewLog(id=review_id or None, user_id=user.id, word_id=word_id, card_id=card.id, rating=rating, review_type=str(data.get("reviewType", "review")), reviewed_at=reviewed_at, elapsed_seconds=data.get("elapsedSeconds"))
     card.review_count += 1; card.last_review_at = reviewed_at
     if rating == 1: card.wrong_count += 1
     else: card.correct_count += 1
     intervals = {1: 1, 2: 1, 3: 3, 4: 7}; card.state = "relearning" if rating == 1 else ("learning" if card.review_count == 1 else "review")
     card.stability = max(1.0, card.stability * 1.35 + (rating - 2) * 0.35); card.difficulty = min(10.0, max(1.0, card.difficulty + {1: 1.0, 2: 0.4, 3: -0.2, 4: -0.4}[rating])); card.due_at = reviewed_at + timedelta(days=intervals[rating])
     db.session.add(log); db.session.commit(); return jsonify({"review": {"id": log.id, "reviewedAt": reviewed_at.isoformat()}, "card": card_json(card)})
+
+
+def existing_card(log):
+    return UserWordCard.query.filter_by(id=log.card_id, user_id=log.user_id).first()
 
 
 @api.get("/vocabularies")
