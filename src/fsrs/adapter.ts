@@ -63,7 +63,7 @@ export async function forget(wordId: string, now = new Date()) {
 
 export async function rollback(wordId: string, reviewLog: ReviewLog) {
   const card = await getCard(wordId);
-  const result = scheduler.rollback(card, reviewLog);
-  await store.putCard({ wordId, card: result.card });
-  return result.card;
+  const previous = scheduler.rollback(card, reviewLog);
+  await store.putCard({ wordId, card: previous });
+  return previous;
 }
