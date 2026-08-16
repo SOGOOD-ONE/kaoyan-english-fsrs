@@ -1,4 +1,4 @@
-import type { Card, Rating, ReviewLog } from "ts-fsrs";
+import { State, type Card, type Rating, type ReviewLog } from "ts-fsrs";
 import { store } from "../db/db";
 import type { StoredCard, StoredReview } from "../types";
 import { apiRequest } from "./api";
@@ -7,8 +7,35 @@ type ServerCard = { id: string; wordId: string; state: string; stability: number
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
 
+function serverStateToLocal(state: string): Card["state"] {
+  const normalized = String(state).toLowerCase();
+  if (normalized === "learning") return State.Learning;
+  if (normalized === "review") return State.Review;
+  if (normalized === "relearning") return State.Relearning;
+  return State.New;
+}
+
+function localStateToServer(state: Card["state"]): string {
+  if (state === State.Learning) return "learning";
+  if (state === State.Review) return "review";
+  if (state === State.Relearning) return "relearning";
+  return "new";
+}
+
 function serverCardToLocal(card: ServerCard): StoredCard {
-  return { wordId: card.wordId, card: { due: new Date(card.dueAt), stability: card.stability, difficulty: card.difficulty, state: card.state as unknown as Card["state"], last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined, reps: card.reviewCount, lapses: card.wrongCount, learning_steps: 0 } as Card };
+  return {
+    wordId: card.wordId,
+    card: {
+      due: new Date(card.dueAt),
+      stability: card.stability,
+      difficulty: card.difficulty,
+      state: serverStateToLocal(card.state),
+      last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined,
+      reps: card.reviewCount,
+      lapses: card.wrongCount,
+      learning_steps: 0,
+    } as Card,
+  };
 }
 
 /** Upload every local review first. The review UUID makes the endpoint idempotent. */
@@ -52,5 +79,24 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
 }
 
 export async function uploadReview(review: StoredReview): Promise<void> {
-  await apiRequest("/reviews", { method: "POST", body: JSON.stringify({ reviewId: review.id, wordId: review.wordId, rating: review.rating, reviewType: "review", reviewedAt: new Date(review.reviewedAt).toISOString() }) });
+  const localCard = await store.getCard(review.wordId);
+  await apiRequest("/reviews", {
+    method: "POST",
+    body: JSON.stringify({
+      reviewId: review.id,
+      wordId: review.wordId,
+      rating: review.rating,
+      reviewType: "review",
+      reviewedAt: new Date(review.reviewedAt).toISOString(),
+      card: localCard ? {
+        state: localStateToServer(localCard.card.state),
+        stability: localCard.card.stability,
+        difficulty: localCard.card.difficulty,
+        dueAt: localCard.card.due.toISOString(),
+        reviewCount: localCard.card.reps,
+        wrongCount: localCard.card.lapses,
+        correctCount: Math.max(0, localCard.card.reps - localCard.card.lapses),
+      } : undefined,
+    }),
+  });
 }
