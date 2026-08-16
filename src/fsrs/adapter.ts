@@ -29,7 +29,6 @@ export async function review(word: Word, rating: Grade, now = new Date()) {
   const wordId = word.id;
   if (!wordId) throw new Error("Word is missing id");
   const card = await getCard(wordId);
-  // repeat() is the canonical API for obtaining the selected RecordLogItem.
   const result = scheduler.repeat(card, now)[rating];
   await store.putCard({ wordId, card: result.card });
   const review: StoredReview = {
@@ -57,14 +56,14 @@ export function stateName(state: State) {
 
 export async function forget(wordId: string, now = new Date()) {
   const card = await getCard(wordId);
-  const forgotten = scheduler.forget(card, now);
-  await store.putCard({ wordId, card: forgotten });
-  return forgotten;
+  const result = scheduler.forget(card, now);
+  await store.putCard({ wordId, card: result.card });
+  return result.card;
 }
 
 export async function rollback(wordId: string, reviewLog: ReviewLog) {
   const card = await getCard(wordId);
-  const previous = scheduler.rollback(card, reviewLog);
-  await store.putCard({ wordId, card: previous });
-  return previous;
+  const result = scheduler.rollback(card, reviewLog);
+  await store.putCard({ wordId, card: result.card });
+  return result.card;
 }
