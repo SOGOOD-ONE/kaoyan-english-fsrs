@@ -5,64 +5,37 @@ import type { Word } from "../types";
 function normalizeKey(value: string) { return value.trim().toLowerCase().replace(/\s+/g, " "); }
 function mergeWord(oldWord: Word | undefined, incoming: Word): Word {
   if (!oldWord) return incoming;
-  return {
-    ...oldWord,
-    ...incoming,
-    meaning: incoming.meaning || oldWord.meaning,
-    example: incoming.example || oldWord.example,
-    tags: Array.from(new Set([...(oldWord.tags ?? []), ...(incoming.tags ?? [])])),
-    examYears: Array.from(new Set([...(oldWord.examYears ?? []), ...(incoming.examYears ?? [])])).sort((a,b)=>a-b),
-    hfCount: incoming.hfCount ?? oldWord.hfCount
-  };
+  return { ...oldWord, ...incoming, id: oldWord.id, meaning: incoming.meaning || oldWord.meaning, example: incoming.example || oldWord.example, tags: Array.from(new Set([...(oldWord.tags ?? []), ...(incoming.tags ?? [])])), examYears: Array.from(new Set([...(oldWord.examYears ?? []), ...(incoming.examYears ?? [])])).sort((a,b)=>a-b), hfCount: incoming.hfCount ?? oldWord.hfCount };
 }
-
 function normalizeWord(row: Record<string, unknown>): Word | null {
-  const pick = (...keys: string[]) => { for (const key of keys) { const value=row[key]; if(value!==undefined&&value!==null&&String(value).trim()) return String(value).trim(); } return ""; };
-  const word = pick("word","Word","单词","词汇","英文","English","term"); if (!word) return null;
-  const explicitId = pick("id","ID","编号");
-  const meaning = pick("meaning","Meaning","释义","中文","中文释义","词义","translation","翻译");
-  const example = pick("example","Example","例句","真题例句","sentence","Sentence","语境");
-  const tagsText = pick("tags","Tags","标签","分类");
-  const hf = pick("hfCount","HFCount","词频","frequency","Frequency");
-  const years = pick("examYears","ExamYears","年份","真题年份");
-  return {
-    id: explicitId || `word-${normalizeKey(word)}`,
-    word, meaning, example: example || undefined,
-    tags: tagsText ? tagsText.split(/[,，、;；|]/).map(s=>s.trim()).filter(Boolean) : undefined,
-    hfCount: hf && !Number.isNaN(Number(hf)) ? Number(hf) : undefined,
-    examYears: years ? years.split(/[,，、;；|]/).map(s=>Number(s.trim())).filter(Number.isFinite) : undefined
-  };
+  const pick=(...keys:string[])=>{for(const key of keys){const value=row[key];if(value!==undefined&&value!==null&&String(value).trim())return String(value).trim();}return "";};
+  const word=pick("word","Word","单词","词汇","英文","English","term");if(!word)return null;
+  const explicitId=pick("id","ID","编号"),meaning=pick("meaning","Meaning","释义","中文","中文释义","词义","translation","翻译"),example=pick("example","Example","例句","真题例句","sentence","Sentence","语境"),tagsText=pick("tags","Tags","标签","分类"),hf=pick("hfCount","HFCount","词频","frequency","Frequency"),years=pick("examYears","ExamYears","年份","真题年份");
+  return {id:explicitId||`word-${normalizeKey(word)}`,word,meaning,example:example||undefined,tags:tagsText?tagsText.split(/[,，、;；|]/).map(s=>s.trim()).filter(Boolean):undefined,hfCount:hf&&!Number.isNaN(Number(hf))?Number(hf):undefined,examYears:years?years.split(/[,，、;；|]/).map(s=>Number(s.trim())).filter(Number.isFinite):undefined};
 }
-function parseCsv(text: string): Record<string, unknown>[] {
-  const rows:string[][]=[]; let row:string[]=[],cell="",quoted=false;
-  for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];if(ch==='"'&&quoted&&next==='"'){cell+='"';i++;}else if(ch==='"')quoted=!quoted;else if(ch===','&&!quoted){row.push(cell);cell="";}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&next==='\n')i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}
-  if(cell||row.length){row.push(cell);rows.push(row);} const headers=(rows[0]??[]).map(h=>h.trim().replace(/^\uFEFF/,""));
-  return rows.slice(1).filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??""])));
-}
+function parseCsv(text:string):Record<string,unknown>[] { const rows:string[][]=[];let row:string[]=[],cell="",quoted=false;for(let i=0;i<text.length;i++){const ch=text[i],next=text[i+1];if(ch==='"'&&quoted&&next==='"'){cell+='"';i++;}else if(ch==='"')quoted=!quoted;else if(ch===','&&!quoted){row.push(cell);cell="";}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&next==='\n')i++;row.push(cell);rows.push(row);row=[];cell="";}else cell+=ch;}if(cell||row.length){row.push(cell);rows.push(row);}const headers=(rows[0]??[]).map(h=>h.trim().replace(/^\uFEFF/,""));return rows.slice(1).filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(headers.map((h,i)=>[h,r[i]??""]))); }
 
-export async function importVocabularyFile(file: File) {
-  const name=file.name.toLowerCase(); let rows:Record<string,unknown>[]=[];
-  if(name.endsWith(".xlsx")||name.endsWith(".xls")){const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const sheet=wb.Sheets[wb.SheetNames[0]];rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(sheet,{defval:""});}
-  else if(name.endsWith(".csv")) rows=parseCsv(await file.text());
+export async function importVocabularyFile(file:File){
+  const name=file.name.toLowerCase();let rows:Record<string,unknown>[]=[];
+  if(name.endsWith(".xlsx")||name.endsWith(".xls")){const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});rows=XLSX.utils.sheet_to_json<Record<string,unknown>>(wb.Sheets[wb.SheetNames[0]],{defval:""});}
+  else if(name.endsWith(".csv"))rows=parseCsv(await file.text());
   else if(name.endsWith(".json")){const data=JSON.parse(await file.text());rows=Array.isArray(data)?data:data.words??[];}
   else throw new Error("只支持 .xlsx、.xls、.csv、.json");
-
   const normalized=rows.map(normalizeWord).filter((x):x is Word=>Boolean(x));
-  // A duplicate is judged by normalized word text, not by row number. Explicit source IDs
-  // are retained only when they do not conflict with an already stored different word.
   const unique=new Map<string,Word>();
-  for(const word of normalized){const key=normalizeKey(word.word);const previous=unique.get(key);unique.set(key,mergeWord(previous,word));}
+  for(const word of normalized){const key=normalizeKey(word.word);unique.set(key,mergeWord(unique.get(key),word));}
+  if(!unique.size)throw new Error("没有识别到词汇，请确认存在“单词/word”列。");
+  const existing=await store.getWords();const byWord=new Map(existing.map(w=>[normalizeKey(w.word),w]));const byId=new Map(existing.filter(w=>w.id).map(w=>[w.id!,w]));
   let inserted=0,updated=0;
-  for(const word of unique.values()){
-    const existing=await store.getWords();
-    const same=existing.find(w=>normalizeKey(w.word)===normalizeKey(word.word));
-    await store.putWord(mergeWord(same,word));
-    if(same) updated++; else inserted++;
+  for(const incoming of unique.values()){
+    const oldByWord=byWord.get(normalizeKey(incoming.word));
+    let word=mergeWord(oldByWord,incoming);
+    const idOwner=word.id?byId.get(word.id):undefined;
+    if(idOwner && normalizeKey(idOwner.word)!==normalizeKey(word.word)) word={...word,id:`word-${normalizeKey(word.word)}`};
+    await store.putWord(word);if(oldByWord)updated++;else inserted++;byWord.set(normalizeKey(word.word),word);if(word.id)byId.set(word.id,word);
   }
-  if(!unique.size) throw new Error("没有识别到词汇，请确认存在“单词/word”列。");
-  return { imported: unique.size, inserted, updated, sourceRows: rows.length, skipped: rows.length-normalized.length, duplicates: normalized.length-unique.size };
+  return {imported:unique.size,inserted,updated,sourceRows:rows.length,skipped:rows.length-normalized.length,duplicates:normalized.length-unique.size};
 }
-
-export async function importWords(words: Word[]) { for(const word of words) await store.putWord(word); }
+export async function importWords(words:Word[]){for(const word of words)await store.putWord(word);}
 export async function exportData(){const [words,cards,reviews]=await Promise.all([store.getWords(),store.getCards(),store.getReviews()]);return{schemaVersion:1,exportedAt:new Date().toISOString(),words,cards,reviews};}
 export function downloadJson(data:unknown,filename:string){const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url);}
