@@ -8,7 +8,7 @@ type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: st
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
 
 function serverCardToLocal(card: ServerCard): StoredCard {
-  return { wordId: card.wordId, card: { due: new Date(card.dueAt), stability: card.stability, difficulty: card.difficulty, state: card.state as Card["state"], last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined, reps: card.reviewCount, lapses: card.wrongCount, learning_steps: 0 } as Card };
+  return { wordId: card.wordId, card: { due: new Date(card.dueAt), stability: card.stability, difficulty: card.difficulty, state: card.state as unknown as Card["state"], last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined, reps: card.reviewCount, lapses: card.wrongCount, learning_steps: 0 } as Card };
 }
 
 /** Upload every local review first. The review UUID makes the endpoint idempotent. */
