@@ -15,6 +15,7 @@ let current: Recommendation | undefined;
 let me: { id: string; email: string; nickname: string } | null = null;
 let vocabularySelections: Record<string, boolean> = {};
 let vocabularies: VocabularySummary[] = [];
+let selectedWordIds: Set<string> | null = null;
 
 type VocabularySummary = { id: string; name: string; kind: string; priority: number; description?: string; wordCount?: number; selected?: boolean };
 
@@ -34,13 +35,22 @@ export async function mount(root: HTMLElement) {
 }
 
 async function loadVocabularyState() {
-  if (!me) { vocabularies = []; vocabularySelections = {}; return; }
+  if (!me) { vocabularies = []; vocabularySelections = {}; selectedWordIds = null; return; }
   try {
     vocabularies = await api<VocabularySummary[]>("/vocabularies");
     const selections = await api<{ vocabularyId: string; enabled: boolean }[]>("/vocabularies/selections");
     vocabularySelections = Object.fromEntries(selections.map(s => [s.vocabularyId, s.enabled]));
     vocabularies = vocabularies.map(v => ({ ...v, selected: vocabularySelections[v.id] ?? false }));
-  } catch { vocabularies = []; vocabularySelections = {}; }
+    const enabled = vocabularies.filter(v => v.selected);
+    if (!enabled.length) { selectedWordIds = new Set(); return; }
+    const details = await Promise.all(enabled.map(v => api<{ words: { id: string }[] }>(`/vocabularies/${v.id}`)));
+    selectedWordIds = new Set(details.flatMap(d => d.words.map(w => w.id)));
+  } catch { vocabularies = []; vocabularySelections = {}; selectedWordIds = null; }
+}
+
+function filterSelected(rows: Recommendation[]) {
+  if (!me || selectedWordIds === null) return rows;
+  return rows.filter(r => !!r.word.id && selectedWordIds.has(r.word.id));
 }
 
 function renderShell(root: HTMLElement) {
@@ -66,7 +76,7 @@ async function renderVocabularyPanel() {
   if (!vocabularies.length) { panel.innerHTML = `<div class="empty"><h2>还没有可用词库</h2><p>请先导入词库或等待系统词库部署。</p></div>`; return; }
   const stats = await Promise.all(vocabularies.map(async v => { try { return await api<{ wordCount: number; learned: number; due: number; new: number; masteryRate: number }>(`/vocabularies/${v.id}/stats`); } catch { return { wordCount: v.wordCount || 0, learned: 0, due: 0, new: v.wordCount || 0, masteryRate: 0 }; } }));
   panel.innerHTML = `<div class="vocab-head"><div><strong>我的词库</strong><span>选择后，今日新词只从启用的词库中抽取</span></div></div><div class="vocab-list">${vocabularies.map((v, i) => { const s = stats[i]; return `<div class="vocab-item"><div class="vocab-info"><label><input type="checkbox" data-vocab="${v.id}" ${v.selected ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><small>${escapeHtml(v.description || "系统词库")} · ${s.wordCount} 词</small><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><b>${s.masteryRate}%</b></div>`; }).join("")}</div>`;
-  panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); vocabularySelections[id] = input.checked; const v = vocabularies.find(x => x.id === id); if (v) v.selected = input.checked; await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
+  panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await loadVocabularyState(); await renderVocabularyPanel(); await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
 }
 
 function showAuth() {
@@ -82,11 +92,12 @@ function showAuth() {
 function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.classList.toggle("active", Number(b.dataset.quota) === quota)); document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode)); }
 
 async function render() {
-  const [newRows, mandatoryRows, selfRows, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
+  const [allNew, allMandatory, allSelf, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
+  const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf);
   const rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
-  document.getElementById("stats")!.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>词库</span></div>`;
+  document.getElementById("stats")!.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
   const cardEl = document.getElementById("card")!; current = rows[0];
-  if (!current) { const message = mode === "new" ? `今天的 ${quota} 个新词已经完成。` : mode === "mandatory" ? "昨天背过的词已经全部复习。" : "目前没有需要自主复习的词。"; cardEl.innerHTML = `<div class="empty"><h2>这一组完成了</h2><p>${message}</p></div>`; return; }
+  if (!current) { const message = me && selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? `今天的 ${quota} 个新词已经完成。` : mode === "mandatory" ? "昨天背过的词已经全部复习。" : "目前没有需要自主复习的词。"; cardEl.innerHTML = `<div class="empty"><h2>这一组完成了</h2><p>${message}</p></div>`; return; }
   const options = preview(current.card), w = current.word;
   cardEl.innerHTML = `<div class="word-card"><div class="progress">${mode === "new" ? "今日新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type || "")}</span><span>${escapeHtml(w.category || "")}</span></div><p class="meaning">${escapeHtml(w.meaning)}</p>${w.example ? `<p class="example">${escapeHtml(w.example)}</p>` : ""}<div class="ratings">${reviewRatings.map(r => `<button class="rating" data-rating="${r}"><strong>${ratingNames[r]}</strong><small>${stateName(options[r].card.state)} · ${formatInterval(options[r].card.due)}</small></button>`).join("")}</div></div>`;
   cardEl.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(b => b.addEventListener("click", async () => { if (!current) return; const wordId = current.word.id, rating = Number(b.dataset.rating) as Grade; await review(current.word, rating); try { await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId, rating, reviewType: mode }) }); } catch { } await render(); }));
