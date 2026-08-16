@@ -63,6 +63,18 @@ class VocabularyWord(db.Model):
     __table_args__ = (db.UniqueConstraint('vocabulary_id', 'word_id', name='uq_vocab_word'),)
 
 
+class UserVocabulary(db.Model):
+    __tablename__ = 'user_vocabularies'
+    id = db.Column(db.String(36), primary_key=True, default=uid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    vocabulary_id = db.Column(db.String(36), db.ForeignKey('vocabularies.id', ondelete='CASCADE'), nullable=False, index=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=True)
+    priority = db.Column(db.Integer, nullable=False, default=50)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('user_id', 'vocabulary_id', name='uq_user_vocabulary'),)
+
+
 class WordExample(db.Model):
     __tablename__ = 'word_examples'
     id = db.Column(db.String(36), primary_key=True, default=uid)
