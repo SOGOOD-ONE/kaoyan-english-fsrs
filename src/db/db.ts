@@ -4,25 +4,22 @@ import type { StoredCard, StoredReview, Word } from "../types";
 interface Schema extends DBSchema {
   words: { key: string; value: Word };
   cards: { key: string; value: StoredCard };
-  reviews: { key: string; value: StoredReview; indexes: { wordId: string; reviewedAt: number; syncedAt: number } };
+  reviews: { key: string; value: StoredReview; indexes: { wordId: string; reviewedAt: number } };
 }
 
 let dbPromise: Promise<IDBPDatabase<Schema>> | undefined;
 
 function db() {
   if (!dbPromise) dbPromise = openDB<Schema>("kaoyan-fsrs", 3, {
-    upgrade(database, oldVersion) {
+    upgrade(database) {
       if (!database.objectStoreNames.contains("words")) database.createObjectStore("words", { keyPath: "id" });
       if (!database.objectStoreNames.contains("cards")) database.createObjectStore("cards", { keyPath: "wordId" });
       if (!database.objectStoreNames.contains("reviews")) {
         const reviews = database.createObjectStore("reviews", { keyPath: "id" });
         reviews.createIndex("wordId", "wordId");
         reviews.createIndex("reviewedAt", "reviewedAt");
-        reviews.createIndex("syncedAt", "syncedAt");
-      } else if (oldVersion < 3) {
-        const reviews = database.transaction.objectStore("reviews");
-        if (!reviews.indexNames.contains("syncedAt")) reviews.createIndex("syncedAt", "syncedAt");
       }
+      // Review synchronization metadata is stored on each existing review, so no destructive migration is needed.
     }
   });
   return dbPromise;
