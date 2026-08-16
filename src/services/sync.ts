@@ -1,16 +1,11 @@
 import type { Card, Rating, ReviewLog } from "ts-fsrs";
 import { store } from "../db/db";
 import type { StoredCard, StoredReview } from "../types";
+import { apiRequest } from "./api";
 
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
-
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, { credentials: "include", ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
-  if (!response.ok) throw new Error(`sync ${response.status}`);
-  return response.json();
-}
 
 function serverCardToLocal(card: ServerCard): StoredCard {
   return { wordId: card.wordId, card: { due: new Date(card.dueAt), stability: card.stability, difficulty: card.difficulty, state: card.state as Card["state"], last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined, reps: card.reviewCount, lapses: card.wrongCount, learning_steps: 0 } as Card };
@@ -25,7 +20,6 @@ export async function pushPendingReviews(): Promise<number> {
       await uploadReview(review);
       uploaded++;
     } catch {
-      // Stop at the first network failure; remaining records stay local for the next sync.
       break;
     }
   }
@@ -34,7 +28,7 @@ export async function pushPendingReviews(): Promise<number> {
 
 export async function syncStudyData(): Promise<{ cards: number; reviews: number; uploaded: number }> {
   const uploaded = await pushPendingReviews();
-  const server = await request<SyncResponse>("/sync/study");
+  const server = await apiRequest<SyncResponse>("/sync/study");
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
 
@@ -58,5 +52,5 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
 }
 
 export async function uploadReview(review: StoredReview): Promise<void> {
-  await request("/reviews", { method: "POST", body: JSON.stringify({ reviewId: review.id, wordId: review.wordId, rating: review.rating, reviewType: "review", reviewedAt: new Date(review.reviewedAt).toISOString() }) });
+  await apiRequest("/reviews", { method: "POST", body: JSON.stringify({ reviewId: review.id, wordId: review.wordId, rating: review.rating, reviewType: "review", reviewedAt: new Date(review.reviewedAt).toISOString() }) });
 }
