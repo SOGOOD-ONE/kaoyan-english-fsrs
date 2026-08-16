@@ -116,7 +116,22 @@ function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-qu
 function installKeyboardShortcuts() { document.removeEventListener("keydown", handleKeydown); document.addEventListener("keydown", handleKeydown); }
 function handleKeydown(event: KeyboardEvent) { const target = event.target as HTMLElement | null; if (target?.matches("input,textarea,select,[contenteditable='true']") || event.repeat) return; if (event.code === "Space") { event.preventDefault(); if (!answerVisible) showAnswer(); return; } if (["1","2","3","4"].includes(event.key) && answerVisible) { event.preventDefault(); void submitRating(Number(event.key) as Grade); } }
 function showAnswer() { if (!current || answerVisible) return; answerVisible = true; renderCurrentCard(); }
-async function submitRating(rating: Grade) { if (!current || !answerVisible) return; const word = current.word; await review(word, rating); try { await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId: word.id, rating, reviewType: mode, reviewId: crypto.randomUUID(), reviewedAt: new Date().toISOString() }) }); } catch { }
+async function submitRating(rating: Grade) {
+  if (!current || !answerVisible) return;
+  const word = current.word;
+  const localReview = await review(word, rating);
+  try {
+    await api(`/reviews`, {
+      method: "POST",
+      body: JSON.stringify({
+        wordId: word.id,
+        rating,
+        reviewType: mode,
+        reviewId: localReview.reviewId,
+        reviewedAt: localReview.reviewedAt,
+      }),
+    });
+  } catch { }
   markAnswered(); answerVisible = false; await render();
 }
 
@@ -124,26 +139,27 @@ async function render() {
   const [allNew, allMandatory, allSelf, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
   const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf);
   const rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
-  const total = mode === "new" ? Math.min(quota, newRows.length) : rows.length;
-  syncSession(total); const remaining = Math.max(0, total - sessionAnswered);
-  const statsEl = document.getElementById("stats")!; const modeLabel = mode === "new" ? "今日背诵" : mode === "mandatory" ? "强制复习" : "自主复习";
-  const sessionLabel = document.getElementById("session-label")!; const sessionCount = document.getElementById("session-count")!;
-  sessionLabel.textContent = modeLabel; sessionCount.textContent = `${Math.min(sessionAnswered, total)} / ${total}`;
-  statsEl.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
-  current = remaining > 0 ? rows[0] : undefined;
-  const cardEl = document.getElementById("card")!;
-  if (!current) { answerVisible = false; cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (!me ? "登录后即可开始云端学习。" : selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`; return; }
-  sessionCount.textContent = `${Math.min(sessionAnswered + 1, total)} / ${total}`; renderCurrentCard(remaining, total);
+  syncSession(rows.length);
+  current = rows[0];
+  renderCurrentCard();
+  const stats = document.getElementById("stats");
+  const sessionCount = document.getElementById("session-count");
+  if (sessionCount) sessionCount.textContent = `${Math.min(sessionAnswered, sessionTotal)} / ${sessionTotal}`;
+  if (stats) stats.innerHTML = `<span>新词 ${newRows.length}</span><span>强制复习 ${mandatoryRows.length}</span><span>待复习 ${selfRows.length}</span><span>词库 ${words.length}</span>`;
+  syncControls();
 }
 
-function renderCurrentCard(remaining?: number, total?: number) {
-  const cardEl = document.getElementById("card"); if (!cardEl || !current) return; const options = preview(current.card), w = current.word;
-  const progress = remaining !== undefined && total !== undefined ? `<div class="session-progress"><span>本轮进度</span><strong>${Math.min(sessionAnswered + 1, total)} / ${total}</strong></div>` : "";
-  const answer = answerVisible ? `<div class="answer"><p class="meaning">${escapeHtml(w.meaning)}</p>${w.example ? `<p class="example">${escapeHtml(w.example)}</p>` : ""}</div>` : `<button id="show-answer" class="show-answer">查看释义 <small>Space</small></button>`;
-  const ratings = answerVisible ? `<div class="ratings">${reviewRatings.map((r, i) => `<button class="rating" data-rating="${r}"><strong>${ratingNames[r]}</strong><small>${i + 1} · ${stateName(options[r].card.state)} · ${formatInterval(options[r].card.due)}</small></button>`).join("")}</div>` : "";
-  cardEl.innerHTML = `<div class="word-card">${progress}<div class="progress">${mode === "new" ? "今日新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type || "")}</span><span>${escapeHtml(w.category || "")}</span></div>${answer}${ratings}</div>`;
-  document.getElementById("show-answer")?.addEventListener("click", showAnswer); cardEl.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(b => b.addEventListener("click", () => void submitRating(Number(b.dataset.rating) as Grade)));
+function renderCurrentCard() {
+  const card = document.getElementById("card");
+  if (!card) return;
+  if (!current) {
+    card.innerHTML = `<div class="empty"><h2>这一组学习完成了</h2><p>${mode === "new" ? "今日新词已经完成。" : "当前没有需要处理的单词。"}</p></div>`;
+    return;
+  }
+  const word = current.word;
+  card.innerHTML = `<div class="study-word"><div class="study-meta"><span>${mode === "new" ? "新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</span><span>熟悉度 ${Math.round(current.retrievability * 100)}%</span></div><h2>${escapeHtml(word.word)}</h2>${word.type ? `<div class="word-type">${escapeHtml(word.type)}</div>` : ""}${answerVisible ? `<div class="study-answer"><p>${escapeHtml(word.meaning)}</p>${word.example ? `<div class="example">${escapeHtml(word.example)}</div>` : ""}</div><div class="rating-row">${reviewRatings.map((r, i) => `<button data-rating="${r}"><kbd>${i + 1}</kbd>${ratingNames[r]}</button>`).join("")}</div>` : `<button id="show-answer" class="show-answer">显示释义 <kbd>Space</kbd></button>`}</div>`;
+  card.querySelector("#show-answer")?.addEventListener("click", showAnswer);
+  card.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", () => void submitRating(Number(button.dataset.rating) as Grade)));
 }
 
-function formatInterval(date: Date) { const hours = Math.max(0, Math.round((date.getTime() - Date.now()) / 3600000)); if (hours < 24) return `${Math.max(1, hours)}小时后`; return `${Math.ceil(hours / 24)}天后`; }
-function escapeHtml(value: string) { return value.replace(/[&<>\"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch]!)); }
+function escapeHtml(value: string) { return value.replace(/[&<>'"]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]!)); }
