@@ -24,20 +24,25 @@ export async function syncPendingReviews() {
               stability: review.card.stability,
               difficulty: review.card.difficulty,
               dueAt: review.card.due.toISOString(),
-              reviewCount: review.card.reps,
-              correctCount: review.rating === 1 ? 0 : 1,
-              wrongCount: review.rating === 1 ? 1 : 0
+              reviewCount: review.card.reps
             }
           })
         });
         await store.markReviewSynced(review.id);
         synced += 1;
       } catch {
-        // Keep the review pending. A later login, app mount, or successful review retries it.
+        // Keep the review pending. A later retry will send it again with the same id.
       }
     }
     return { synced, pending: Math.max(0, pending.length - synced) };
   } finally {
     syncing = false;
   }
+}
+
+export function startReviewSync() {
+  if (typeof window === "undefined") return;
+  void syncPendingReviews();
+  window.addEventListener("online", () => void syncPendingReviews());
+  window.setInterval(() => void syncPendingReviews(), 30000);
 }
