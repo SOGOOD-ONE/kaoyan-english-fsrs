@@ -1,6 +1,8 @@
 import "./style.css";
 import { mount } from "./ui/app";
 import { mountSettings } from "./ui/settings";
+import { mountVocabularies } from "./ui/vocabularies";
+import { mountHistory } from "./ui/history";
 import { syncStudyData } from "./services/sync";
 import { installSummaryObserver } from "./ui/summaryObserver";
 import { apiRequest } from "./services/api";
@@ -11,10 +13,9 @@ if (!root) throw new Error("Missing #app");
 async function bootstrap() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
 
-  if (path === "/settings") {
-    await mountSettings(root);
-    return;
-  }
+  if (path === "/settings") { await mountSettings(root); return; }
+  if (path === "/vocabularies") { await mountVocabularies(root); return; }
+  if (path === "/history") { await mountHistory(root); return; }
 
   try {
     const me = await apiRequest<{ user: unknown }>("/auth/me");
