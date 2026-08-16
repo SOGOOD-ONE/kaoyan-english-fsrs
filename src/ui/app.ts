@@ -13,6 +13,10 @@ let quota = Number(localStorage.getItem("daily-new-quota") || 100);
 if (![80, 100, 150, 200].includes(quota)) quota = 100;
 let current: Recommendation | undefined;
 let me: { id: string; email: string; nickname: string } | null = null;
+let vocabularySelections: Record<string, boolean> = {};
+let vocabularies: VocabularySummary[] = [];
+
+type VocabularySummary = { id: string; name: string; kind: string; priority: number; description?: string; wordCount?: number; selected?: boolean };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, { credentials: "include", ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } });
@@ -24,18 +28,45 @@ export async function mount(root: HTMLElement) {
   const words = await store.getWords();
   if (!words.length) for (const word of VOCAB_DATA) await store.putWord({ ...word, id: word.id ?? `vocab-${crypto.randomUUID()}` });
   try { const result = await api<{ user: typeof me }>("/auth/me"); me = result.user; } catch { me = null; }
+  await loadVocabularyState();
   renderShell(root);
   await render();
 }
 
+async function loadVocabularyState() {
+  if (!me) { vocabularies = []; vocabularySelections = {}; return; }
+  try {
+    vocabularies = await api<VocabularySummary[]>("/vocabularies");
+    const selections = await api<{ vocabularyId: string; enabled: boolean }[]>("/vocabularies/selections");
+    vocabularySelections = Object.fromEntries(selections.map(s => [s.vocabularyId, s.enabled]));
+    vocabularies = vocabularies.map(v => ({ ...v, selected: vocabularySelections[v.id] ?? false }));
+  } catch { vocabularies = []; vocabularySelections = {}; }
+}
+
 function renderShell(root: HTMLElement) {
-  root.innerHTML = `<main class="shell"><header><div><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="actions"><span id="user-area">${me ? `你好，${escapeHtml(me.nickname)} <button id="logout">退出</button>` : `<button id="login">登录 / 注册</button>`}</span><button id="export">导出</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div></header><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel"><div class="stats" id="stats"></div></section><section class="panel" id="card"></section></main>`;
+  root.innerHTML = `<main class="shell"><header><div><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="actions"><span id="user-area">${me ? `你好，${escapeHtml(me.nickname)} <button id="logout">退出</button>` : `<button id="login">登录 / 注册</button>`}</span><button id="vocab-manage">我的词库</button><button id="export">导出</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div></header><section id="vocab-panel" class="panel vocab-panel" hidden></section><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel"><div class="stats" id="stats"></div></section><section class="panel" id="card"></section></main>`;
   document.getElementById("export")!.addEventListener("click", async () => downloadJson(await exportData(), "kaoyan-fsrs-backup.json"));
   document.getElementById("import")!.addEventListener("change", async e => { const input = e.target as HTMLInputElement, file = input.files?.[0]; if (!file) return; try { const result = await importVocabularyFile(file); alert(`识别 ${result.sourceRows} 行，新增 ${result.inserted}，更新 ${result.updated}，去重 ${result.duplicates}`); await render(); } catch (error) { alert(error instanceof Error ? error.message : "导入失败"); } finally { input.value = ""; } });
   document.getElementById("login")?.addEventListener("click", showAuth);
-  document.getElementById("logout")?.addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }).catch(() => undefined); me = null; renderShell(root); await render(); });
+  document.getElementById("logout")?.addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }).catch(() => undefined); me = null; await loadVocabularyState(); renderShell(root); await render(); });
+  document.getElementById("vocab-manage")!.addEventListener("click", toggleVocabularyPanel);
   document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => { quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota)); syncControls(); await render(); }));
   document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); syncControls(); await render(); }));
+}
+
+async function toggleVocabularyPanel() {
+  if (!me) { showAuth(); return; }
+  const panel = document.getElementById("vocab-panel")!;
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden) await renderVocabularyPanel();
+}
+
+async function renderVocabularyPanel() {
+  const panel = document.getElementById("vocab-panel")!;
+  if (!vocabularies.length) { panel.innerHTML = `<div class="empty"><h2>还没有可用词库</h2><p>请先导入词库或等待系统词库部署。</p></div>`; return; }
+  const stats = await Promise.all(vocabularies.map(async v => { try { return await api<{ wordCount: number; learned: number; due: number; new: number; masteryRate: number }>(`/vocabularies/${v.id}/stats`); } catch { return { wordCount: v.wordCount || 0, learned: 0, due: 0, new: v.wordCount || 0, masteryRate: 0 }; } }));
+  panel.innerHTML = `<div class="vocab-head"><div><strong>我的词库</strong><span>选择后，今日新词只从启用的词库中抽取</span></div></div><div class="vocab-list">${vocabularies.map((v, i) => { const s = stats[i]; return `<div class="vocab-item"><div class="vocab-info"><label><input type="checkbox" data-vocab="${v.id}" ${v.selected ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><small>${escapeHtml(v.description || "系统词库")} · ${s.wordCount} 词</small><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><b>${s.masteryRate}%</b></div>`; }).join("")}</div>`;
+  panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); vocabularySelections[id] = input.checked; const v = vocabularies.find(x => x.id === id); if (v) v.selected = input.checked; await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
 }
 
 function showAuth() {
