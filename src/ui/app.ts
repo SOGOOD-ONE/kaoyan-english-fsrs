@@ -1,10 +1,11 @@
 import { Rating, preview, review, stateName, type Grade } from "../fsrs/adapter";
 import { getNewRecommendations, getMandatoryRecommendations, getSelfReviewRecommendations, type Recommendation } from "../services/recommend";
 import { downloadJson, exportData, importVocabularyFile } from "../services/importExport";
-import { getStudyHistory, type HistoryResponse } from "../services/history";
+import { getStudyHistory } from "../services/history";
 import { apiRequest } from "../services/api";
 import { store } from "../db/db";
 import { VOCAB_DATA } from "../data/vocab";
+import { studyNav } from "./studyNav";
 
 const reviewRatings: Grade[] = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy];
 const ratingNames: Record<Grade, string> = { [Rating.Again]: "不认识", [Rating.Hard]: "模糊", [Rating.Good]: "认识", [Rating.Easy]: "很熟" };
@@ -42,9 +43,7 @@ export async function mount(root: HTMLElement) {
 async function hydrateServerVocabulary() {
   try {
     const result = await api<{ words: ServerWord[] }>("/study/available");
-    for (const word of result.words) {
-      await store.putWord({ id: word.id, word: word.word, meaning: word.meaning, type: word.type, category: word.category });
-    }
+    for (const word of result.words) await store.putWord({ id: word.id, word: word.word, meaning: word.meaning, type: word.type, category: word.category });
   } catch { /* Local/offline mode remains available. */ }
 }
 
@@ -65,23 +64,41 @@ async function loadVocabularyState() {
 function filterSelected(rows: Recommendation[]) { if (!me || selectedWordIds === null) return rows; return rows.filter(r => !!r.word.id && selectedWordIds.has(r.word.id)); }
 
 function renderShell(root: HTMLElement) {
-  root.innerHTML = `<main class="shell"><header><div><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="actions"><span id="user-area">${me ? `你好，${escapeHtml(me.nickname)} <button id="logout">退出</button>` : `<button id="login">登录 / 注册</button>`}</span><button id="vocab-manage">我的词库</button><button id="history-manage">学习历史</button><button id="export">导出</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div></header><section id="vocab-panel" class="panel vocab-panel" hidden></section><section id="history-panel" class="panel history-panel" hidden></section><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel"><div class="stats" id="stats"></div></section><section class="panel" id="card"></section></main>`;
+  root.innerHTML = `<main class="shell home-shell"><header class="home-header"><div class="home-brand"><h1>考研英语</h1><p>专注真题语境的智能背词</p></div><div class="home-header-right">${studyNav("/")}<div class="home-account">${me ? `<span>你好，${escapeHtml(me.nickname)}</span><button id="logout" class="nav-quiet">退出</button>` : `<a href="/login" class="nav-quiet">登录</a>`}</div></div></header><section class="today-head"><div><span class="eyebrow">今日学习</span><h2>开始你的记忆训练</h2><p>先主动回忆，再查看释义，最后进行 FSRS 评分。</p></div><div class="today-actions"><button id="vocab-manage">词库</button><button id="history-manage">历史</button><button id="settings-manage">设置</button></div></section><section class="today-overview panel"><div class="today-overview-main"><strong id="session-label">今日背诵</strong><span id="session-count">0 / 0</span></div><div class="today-stats" id="stats"></div></section><section class="panel plan-panel"><div class="plan-title"><div><strong>每日新词</strong><span>今天计划背多少个？</span></div></div><div class="quota-row">${QUOTAS.map(q => `<button class="quota ${q === quota ? "active" : ""}" data-quota="${q}">${q}</button>`).join("")}</div></section><section class="panel mode-panel"><button class="mode ${mode === "new" ? "active" : ""}" data-mode="new"><strong>今日背诵</strong><span>按计划学习新词</span></button><button class="mode ${mode === "mandatory" ? "active" : ""}" data-mode="mandatory"><strong>强制复习</strong><span>复习昨天背过的词</span></button><button class="mode ${mode === "self" ? "active" : ""}" data-mode="self"><strong>自主复习</strong><span>算法判断需要复习的词</span></button></section><section class="panel study-card-panel" id="card"></section><section class="home-tools"><button id="export">导出数据</button><label class="button">导入词汇<input id="import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></section><section id="vocab-panel" class="panel vocab-panel" hidden></section><section id="history-panel" class="panel history-panel" hidden></section></main>`;
+
   document.getElementById("export")!.addEventListener("click", async () => downloadJson(await exportData(), "kaoyan-fsrs-backup.json"));
-  document.getElementById("import")!.addEventListener("change", async e => { const input = e.target as HTMLInputElement, file = input.files?.[0]; if (!file) return; try { const result = await importVocabularyFile(file); alert(`识别 ${result.sourceRows} 行，新增 ${result.inserted}，更新 ${result.updated}，去重 ${result.duplicates}${result.serverSynchronized ? "，已同步云端" : "，当前仅保存本地"}`); await hydrateServerVocabulary(); await loadVocabularyState(); resetSession(); await render(); } catch (error) { alert(error instanceof Error ? error.message : "导入失败"); } finally { input.value = ""; } });
-  document.getElementById("login")?.addEventListener("click", showAuth);
-  document.getElementById("logout")?.addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }).catch(() => undefined); me = null; await loadVocabularyState(); renderShell(root); await render(); installKeyboardShortcuts(); });
-  document.getElementById("vocab-manage")!.addEventListener("click", toggleVocabularyPanel);
-  document.getElementById("history-manage")!.addEventListener("click", toggleHistoryPanel);
+  document.getElementById("import")!.addEventListener("change", async e => {
+    const input = e.target as HTMLInputElement, file = input.files?.[0];
+    if (!file) return;
+    try {
+      const result = await importVocabularyFile(file);
+      alert(`识别 ${result.sourceRows} 行，新增 ${result.inserted}，更新 ${result.updated}，去重 ${result.duplicates}${result.serverSynchronized ? "，已同步云端" : "，当前仅保存本地"}`);
+      await hydrateServerVocabulary();
+      await loadVocabularyState();
+      resetSession();
+      await render();
+    } catch (error) { alert(error instanceof Error ? error.message : "导入失败"); }
+    finally { input.value = ""; }
+  });
+  document.getElementById("logout")?.addEventListener("click", async () => { await api("/auth/logout", { method: "POST" }).catch(() => undefined); location.reload(); });
+  document.getElementById("vocab-manage")!.addEventListener("click", () => { location.href = "/vocabularies"; });
+  document.getElementById("history-manage")!.addEventListener("click", () => { location.href = "/history"; });
+  document.getElementById("settings-manage")!.addEventListener("click", () => { location.href = "/settings"; });
   document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => { quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota)); resetSession(); syncControls(); await render(); }));
   document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); resetSession(); answerVisible = false; syncControls(); await render(); }));
 }
 
-async function toggleVocabularyPanel() { if (!me) { showAuth(); return; } const panel = document.getElementById("vocab-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderVocabularyPanel(); }
-async function toggleHistoryPanel() { if (!me) { showAuth(); return; } const panel = document.getElementById("history-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderHistoryPanel(); }
+async function toggleVocabularyPanel() { if (!me) { location.href = "/login"; return; } const panel = document.getElementById("vocab-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderVocabularyPanel(); }
+async function toggleHistoryPanel() { if (!me) { location.href = "/login"; return; } const panel = document.getElementById("history-panel")!; panel.hidden = !panel.hidden; if (!panel.hidden) await renderHistoryPanel(); }
 
 async function renderHistoryPanel() {
   const panel = document.getElementById("history-panel")!; panel.innerHTML = `<div class="empty"><p>正在读取学习历史…</p></div>`;
-  try { const history = await getStudyHistory(30); const recent = history.days.slice().reverse(); const totalReviews = recent.reduce((sum, day) => sum + day.totalReviews, 0); const accuracy = totalReviews ? Math.round(recent.reduce((sum, day) => sum + day.accuracy * day.totalReviews, 0) / totalReviews) : 0; panel.innerHTML = `<div class="history-head"><div><strong>学习历史</strong><span>最近 30 天</span></div><div class="history-kpis"><b>${history.totalReviews}</b><small>累计复习</small><b>${history.activeDays}</b><small>活跃天数</small><b>${history.streak}</b><small>连续学习</small><b>${accuracy}%</b><small>平均正确率</small></div></div><div class="history-list">${recent.map(day => `<div class="history-row"><div><strong>${escapeHtml(day.date)}</strong><small>${day.learnedWords} 个单词 · ${day.totalReviews} 次复习</small></div><div class="history-bar"><span style="width:${Math.min(100, day.accuracy)}%"></span></div><b>${day.accuracy}%</b><small class="history-breakdown">${day.again}/${day.hard}/${day.good}/${day.easy}</small></div>`).join("") || `<div class="empty"><p>还没有学习记录。</p></div>`}</div>`; } catch { panel.innerHTML = `<div class="empty"><h2>暂时无法读取历史</h2><p>请登录并确认网络连接正常。</p></div>`; }
+  try {
+    const history = await getStudyHistory(30); const recent = history.days.slice().reverse();
+    const totalReviews = recent.reduce((sum, day) => sum + day.totalReviews, 0);
+    const accuracy = totalReviews ? Math.round(recent.reduce((sum, day) => sum + day.accuracy * day.totalReviews, 0) / totalReviews) : 0;
+    panel.innerHTML = `<div class="history-head"><div><strong>学习历史</strong><span>最近 30 天</span></div><div class="history-kpis"><b>${history.totalReviews}</b><small>累计复习</small><b>${history.activeDays}</b><small>活跃天数</small><b>${history.streak}</b><small>连续学习</small><b>${accuracy}%</b><small>平均正确率</small></div></div><div class="history-list">${recent.map(day => `<div class="history-row"><div><strong>${escapeHtml(day.date)}</strong><small>${day.learnedWords} 个单词 · ${day.totalReviews} 次复习</small></div><div class="history-bar"><span style="width:${Math.min(100, day.accuracy)}%"></span></div><b>${day.accuracy}%</b><small class="history-breakdown">${day.again}/${day.hard}/${day.good}/${day.easy}</small></div>`).join("") || `<div class="empty"><p>还没有学习记录。</p></div>`}</div>`;
+  } catch { panel.innerHTML = `<div class="empty"><h2>暂时无法读取历史</h2><p>请登录并确认网络连接正常。</p></div>`; }
 }
 
 async function renderVocabularyPanel() {
@@ -92,8 +109,6 @@ async function renderVocabularyPanel() {
   panel.querySelectorAll<HTMLInputElement>("[data-vocab]").forEach(input => input.addEventListener("change", async () => { const id = input.dataset.vocab!; try { await api(`/vocabularies/${id}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await loadVocabularyState(); resetSession(); await renderVocabularyPanel(); await render(); } catch (error) { input.checked = !input.checked; alert(error instanceof Error ? error.message : "保存失败"); } }));
 }
 
-function showAuth() { const email = prompt("邮箱"); if (!email) return; const password = prompt("密码（至少 8 位）"); if (!password) return; const nickname = prompt("昵称（注册时填写，已有账号可直接回车）") || "考研用户"; api<{ user: { id: string; email: string; nickname: string } }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }).then(result => { me = result.user; location.reload(); }).catch(async error => { if (error.message !== "invalid_credentials") { alert(error.message); return; } try { const result = await api<{ user: { id: string; email: string; nickname: string } }>("/auth/register", { method: "POST", body: JSON.stringify({ email, password, nickname }) }); me = result.user; location.reload(); } catch (registerError) { alert(registerError instanceof Error ? registerError.message : "登录失败"); } }); }
-
 function resetSession() { sessionAnswered = 0; sessionTotal = 0; sessionKey = ""; }
 function getSessionKey() { return `${new Date().toISOString().slice(0, 10)}:${mode}:${quota}:${Array.from(selectedWordIds || []).sort().join(",")}`; }
 function syncSession(total: number) { const key = getSessionKey(); if (sessionKey !== key) { sessionKey = key; sessionAnswered = Number(localStorage.getItem(`session:${key}`) || 0); sessionTotal = total; } else { sessionTotal = total; } }
@@ -102,8 +117,46 @@ function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-qu
 function installKeyboardShortcuts() { document.removeEventListener("keydown", handleKeydown); document.addEventListener("keydown", handleKeydown); }
 function handleKeydown(event: KeyboardEvent) { const target = event.target as HTMLElement | null; if (target?.matches("input,textarea,select,[contenteditable='true']") || event.repeat) return; if (event.code === "Space") { event.preventDefault(); if (!answerVisible) showAnswer(); return; } if (["1","2","3","4"].includes(event.key) && answerVisible) { event.preventDefault(); void submitRating(Number(event.key) as Grade); } }
 function showAnswer() { if (!current || answerVisible) return; answerVisible = true; renderCurrentCard(); }
-async function submitRating(rating: Grade) { if (!current || !answerVisible) return; const word = current.word; await review(word, rating); try { await api(`/reviews`, { method:"POST", body:JSON.stringify({ wordId:word.id, rating, reviewType:mode, reviewId:crypto.randomUUID(), reviewedAt:new Date().toISOString() }) }); } catch { } markAnswered(); answerVisible=false; await render(); }
-async function render() { const [allNew,allMandatory,allSelf,words]=await Promise.all([getNewRecommendations(quota),getMandatoryRecommendations(),getSelfReviewRecommendations(),store.getWords()]); const newRows=filterSelected(allNew),mandatoryRows=filterSelected(allMandatory),selfRows=filterSelected(allSelf),rows=mode==="new"?newRows:mode==="mandatory"?mandatoryRows:selfRows; const total=mode==="new"?Math.min(quota,newRows.length):rows.length; syncSession(total); const remaining=Math.max(0,total-sessionAnswered); document.getElementById("stats")!.innerHTML=`<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`; current=remaining>0?rows[0]:undefined; const cardEl=document.getElementById("card")!; if(!current){answerVisible=false;cardEl.innerHTML=`<div class="empty"><h2>${total?"这一组完成了":"暂时没有学习任务"}</h2><p>${total?`今日已完成 ${sessionAnswered} / ${total}`:(me&&selectedWordIds?.size===0?"请先在「我的词库」中启用至少一个词库。":mode==="new"?"今天没有可用的新词。":mode==="mandatory"?"目前没有需要强制复习的词。":"目前没有需要自主复习的词。")}</p></div>`;return;} renderCurrentCard(remaining,total); }
-function renderCurrentCard(remaining?:number,total?:number){const cardEl=document.getElementById("card");if(!cardEl||!current)return;const options=preview(current.card),w=current.word;const progress=remaining!==undefined&&total!==undefined?`<div class="session-progress"><span>本轮进度</span><strong>${Math.min(sessionAnswered+1,total)} / ${total}</strong></div>`:"";const answer=answerVisible?`<div class="answer"><p class="meaning">${escapeHtml(w.meaning)}</p>${w.example?`<p class="example">${escapeHtml(w.example)}</p>`:""}</div>`:`<button id="show-answer" class="show-answer">查看释义 <small>Space</small></button>`;const ratings=answerVisible?`<div class="ratings">${reviewRatings.map((r,i)=>`<button class="rating" data-rating="${r}"><strong>${ratingNames[r]}</strong><small>${i+1} · ${stateName(options[r].card.state)} · ${formatInterval(options[r].card.due)}</small></button>`).join("")}</div>`:"";cardEl.innerHTML=`<div class="word-card">${progress}<div class="progress">${mode==="new"?"今日新词":mode==="mandatory"?"强制复习":"自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type||"")}</span><span>${escapeHtml(w.category||"")}</span></div>${answer}${ratings}</div>`;document.getElementById("show-answer")?.addEventListener("click",showAnswer);cardEl.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(b=>b.addEventListener("click",()=>void submitRating(Number(b.dataset.rating) as Grade)));}
-function formatInterval(date:Date){const hours=Math.max(0,Math.round((date.getTime()-Date.now())/3600000));if(hours<24)return`${Math.max(1,hours)}小时后`;return`${Math.ceil(hours/24)}天后`;}
-function escapeHtml(value:string){return value.replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[ch]!));}
+async function submitRating(rating: Grade) { if (!current || !answerVisible) return; const word = current.word; await review(word, rating); try { await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId: word.id, rating, reviewType: mode, reviewId: crypto.randomUUID(), reviewedAt: new Date().toISOString() }) }); } catch { }
+  markAnswered(); answerVisible = false; await render();
+}
+
+async function render() {
+  const [allNew, allMandatory, allSelf, words] = await Promise.all([getNewRecommendations(quota), getMandatoryRecommendations(), getSelfReviewRecommendations(), store.getWords()]);
+  const newRows = filterSelected(allNew), mandatoryRows = filterSelected(allMandatory), selfRows = filterSelected(allSelf);
+  const rows = mode === "new" ? newRows : mode === "mandatory" ? mandatoryRows : selfRows;
+  const total = mode === "new" ? Math.min(quota, newRows.length) : rows.length;
+  syncSession(total);
+  const remaining = Math.max(0, total - sessionAnswered);
+  const statsEl = document.getElementById("stats")!;
+  const modeLabel = mode === "new" ? "今日背诵" : mode === "mandatory" ? "强制复习" : "自主复习";
+  const sessionLabel = document.getElementById("session-label")!;
+  const sessionCount = document.getElementById("session-count")!;
+  sessionLabel.textContent = modeLabel;
+  sessionCount.textContent = `${Math.min(sessionAnswered + (remaining > 0 ? 0 : 0), total)} / ${total}`;
+  statsEl.innerHTML = `<div><b>${newRows.length}</b><span>今日新词</span></div><div><b>${mandatoryRows.length}</b><span>强制复习</span></div><div><b>${selfRows.length}</b><span>自主复习</span></div><div><b>${words.length}</b><span>本地词库</span></div>`;
+
+  current = remaining > 0 ? rows[0] : undefined;
+  const cardEl = document.getElementById("card")!;
+  if (!current) {
+    answerVisible = false;
+    cardEl.innerHTML = `<div class="empty"><h2>${total ? "这一组完成了" : "暂时没有学习任务"}</h2><p>${total ? `今日已完成 ${sessionAnswered} / ${total}` : (me && selectedWordIds?.size === 0 ? "请先在「我的词库」中启用至少一个词库。" : mode === "new" ? "今天没有可用的新词。" : mode === "mandatory" ? "目前没有需要强制复习的词。" : "目前没有需要自主复习的词。")}</p></div>`;
+    return;
+  }
+  sessionCount.textContent = `${Math.min(sessionAnswered + 1, total)} / ${total}`;
+  renderCurrentCard(remaining, total);
+}
+
+function renderCurrentCard(remaining?: number, total?: number) {
+  const cardEl = document.getElementById("card"); if (!cardEl || !current) return;
+  const options = preview(current.card), w = current.word;
+  const progress = remaining !== undefined && total !== undefined ? `<div class="session-progress"><span>本轮进度</span><strong>${Math.min(sessionAnswered + 1, total)} / ${total}</strong></div>` : "";
+  const answer = answerVisible ? `<div class="answer"><p class="meaning">${escapeHtml(w.meaning)}</p>${w.example ? `<p class="example">${escapeHtml(w.example)}</p>` : ""}</div>` : `<button id="show-answer" class="show-answer">查看释义 <small>Space</small></button>`;
+  const ratings = answerVisible ? `<div class="ratings">${reviewRatings.map((r, i) => `<button class="rating" data-rating="${r}"><strong>${ratingNames[r]}</strong><small>${i + 1} · ${stateName(options[r].card.state)} · ${formatInterval(options[r].card.due)}</small></button>`).join("")}</div>` : "";
+  cardEl.innerHTML = `<div class="word-card">${progress}<div class="progress">${mode === "new" ? "今日新词" : mode === "mandatory" ? "强制复习" : "自主复习"}</div><h2>${escapeHtml(w.word)}</h2><div class="meta"><span>${escapeHtml(w.type || "")}</span><span>${escapeHtml(w.category || "")}</span></div>${answer}${ratings}</div>`;
+  document.getElementById("show-answer")?.addEventListener("click", showAnswer);
+  cardEl.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(b => b.addEventListener("click", () => void submitRating(Number(b.dataset.rating) as Grade)));
+}
+
+function formatInterval(date: Date) { const hours = Math.max(0, Math.round((date.getTime() - Date.now()) / 3600000)); if (hours < 24) return `${Math.max(1, hours)}小时后`; return `${Math.ceil(hours / 24)}天后`; }
+function escapeHtml(value: string) { return value.replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#039;" }[ch]!)); }
