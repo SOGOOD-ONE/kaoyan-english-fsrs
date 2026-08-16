@@ -5,7 +5,6 @@ import { mountVocabularies } from "./ui/vocabularies";
 import { mountHistory } from "./ui/history";
 import { mountAuth } from "./ui/auth";
 import { syncStudyData } from "./services/sync";
-import { installSummaryObserver } from "./ui/summaryObserver";
 import { apiRequest } from "./services/api";
 
 const root = document.querySelector<HTMLDivElement>("#app");
@@ -38,7 +37,6 @@ async function bootstrap() {
     }
   } catch (error) { console.warn("Auth check skipped:", error); }
 
-  installSummaryObserver(root);
   await mount(root);
 }
 
