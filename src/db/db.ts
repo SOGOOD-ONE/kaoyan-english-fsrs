@@ -8,9 +8,17 @@ interface Schema extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<Schema>> | undefined;
+let dbScope = "anonymous";
+
+export function setStoreUser(userId?: string | null) {
+  const nextScope = userId ? `user-${userId}` : "anonymous";
+  if (nextScope === dbScope) return;
+  dbScope = nextScope;
+  dbPromise = undefined;
+}
 
 function db() {
-  if (!dbPromise) dbPromise = openDB<Schema>("kaoyan-fsrs", 3, {
+  if (!dbPromise) dbPromise = openDB<Schema>(`kaoyan-fsrs-${dbScope}`, 3, {
     upgrade(database) {
       if (!database.objectStoreNames.contains("words")) database.createObjectStore("words", { keyPath: "id" });
       if (!database.objectStoreNames.contains("cards")) database.createObjectStore("cards", { keyPath: "wordId" });
@@ -19,7 +27,6 @@ function db() {
         reviews.createIndex("wordId", "wordId");
         reviews.createIndex("reviewedAt", "reviewedAt");
       }
-      // Review synchronization metadata is stored on each existing review, so no destructive migration is needed.
     }
   });
   return dbPromise;
