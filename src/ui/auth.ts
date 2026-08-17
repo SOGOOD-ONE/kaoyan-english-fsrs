@@ -2,6 +2,7 @@ import { apiRequest } from "../services/api";
 import { appPath } from "../main";
 
 type AuthResult = { user: { id: string; email: string; nickname: string } };
+type SettingsResult = { dailyNewQuota: number };
 
 export async function mountAuth(root: HTMLElement, initialMode: "login" | "register" = "login") {
   let mode: "login" | "register" = initialMode;
@@ -21,6 +22,10 @@ export async function mountAuth(root: HTMLElement, initialMode: "login" | "regis
     submit.setAttribute("disabled", "true");
     try {
       await apiRequest<AuthResult>(mode === "login" ? "/auth/login" : "/auth/register", { method: "POST", body: JSON.stringify(mode === "login" ? { email, password } : { email, password, nickname }) });
+      try {
+        const settings = await apiRequest<SettingsResult>("/settings");
+        if ([80, 100, 150, 200].includes(settings.dailyNewQuota)) localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
+      } catch { /* 首页仍可使用默认额度，云端设置不会被覆盖。 */ }
       location.href = appPath("/");
     } catch (error) {
       const code = error instanceof Error ? error.message : "auth_failed";
