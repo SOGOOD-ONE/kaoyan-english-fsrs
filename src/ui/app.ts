@@ -26,9 +26,11 @@ let sessionTotal = 0;
 let sessionKey = "";
 let submittingReview = false;
 let syncError = "";
+let todayProgress: { newCompleted: number; mandatoryCompleted: number; selfCompleted: number } | null = null;
 
 type VocabularySummary = { id: string; name: string; kind: string; priority: number; description?: string; wordCount?: number; selected?: boolean };
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
+type TodayStudy = { newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number; mandatoryCompleted: number; selfCompleted: number };
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> { return apiRequest<T>(path, init); }
 
@@ -36,11 +38,26 @@ export async function mount(root: HTMLElement) {
   const words = await store.getWords();
   if (!words.length) for (const word of VOCAB_DATA) await store.putWord({ ...word, id: word.id ?? `vocab-${uuid()}` });
   try { const result = await api<{ user: typeof me }>("/auth/me"); me = result.user; } catch { me = null; }
-  if (me) await hydrateServerVocabulary();
+  if (me) {
+    await hydrateServerVocabulary();
+    await loadTodayProgress();
+  } else {
+    todayProgress = null;
+  }
   await loadVocabularyState();
   renderShell(root);
   await render();
   installKeyboardShortcuts();
+}
+
+async function loadTodayProgress() {
+  if (!me) { todayProgress = null; return; }
+  try {
+    const result = await api<TodayStudy>("/study/today");
+    todayProgress = { newCompleted: result.newCompleted, mandatoryCompleted: result.mandatoryCompleted, selfCompleted: result.selfCompleted };
+  } catch {
+    todayProgress = null;
+  }
 }
 
 async function hydrateServerVocabulary() {
@@ -82,7 +99,11 @@ function renderShell(root: HTMLElement) {
   document.getElementById("vocab-manage")?.addEventListener("click", () => { location.href = "/vocabularies"; });
   document.getElementById("history-manage")?.addEventListener("click", () => { location.href = "/history"; });
   document.getElementById("settings-manage")?.addEventListener("click", () => { location.href = "/settings"; });
-  document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => { quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota)); resetSession(); syncControls(); await render(); }));
+  document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.addEventListener("click", async () => {
+    quota = Number(b.dataset.quota); localStorage.setItem("daily-new-quota", String(quota));
+    if (me) { try { await api("/settings", { method: "PUT", body: JSON.stringify({ dailyNewQuota: quota }) }); await loadTodayProgress(); } catch { syncError = "每日新词数量暂未同步到云端，请检查网络连接。"; } }
+    resetSession(); syncControls(); await render();
+  }));
   document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.addEventListener("click", async () => { mode = b.dataset.mode as Mode; localStorage.setItem("study-mode", mode); resetSession(); answerVisible = false; syncControls(); await render(); }));
 }
 
@@ -105,8 +126,26 @@ async function renderVocabularyPanel() {
 
 function resetSession() { sessionAnswered = 0; sessionTotal = 0; sessionKey = ""; syncError = ""; submittingReview = false; }
 function getSessionKey() { return `${new Date().toISOString().slice(0, 10)}:${mode}:${quota}:${Array.from(selectedWordIds || []).sort().join(",")}`; }
-function syncSession(total: number) { const key = getSessionKey(); if (sessionKey !== key) { sessionKey = key; sessionAnswered = Number(localStorage.getItem(`session:${key}`) || 0); sessionTotal = total; } }
-function markAnswered() { sessionAnswered += 1; localStorage.setItem(`session:${sessionKey}`, String(sessionAnswered)); }
+function getServerCompleted(): number | null { if (!todayProgress) return null; if (mode === "new") return todayProgress.newCompleted; if (mode === "mandatory") return todayProgress.mandatoryCompleted; return todayProgress.selfCompleted; }
+function syncSession(total: number) {
+  const key = getSessionKey();
+  if (sessionKey !== key) {
+    sessionKey = key;
+    const serverCompleted = getServerCompleted();
+    sessionAnswered = serverCompleted !== null ? serverCompleted : Number(localStorage.getItem(`session:${key}`) || 0);
+    sessionTotal = total;
+  }
+}
+function markAnswered() {
+  sessionAnswered += 1;
+  if (me && todayProgress) {
+    if (mode === "new") todayProgress.newCompleted += 1;
+    else if (mode === "mandatory") todayProgress.mandatoryCompleted += 1;
+    else todayProgress.selfCompleted += 1;
+  } else {
+    localStorage.setItem(`session:${sessionKey}`, String(sessionAnswered));
+  }
+}
 function syncControls() { document.querySelectorAll<HTMLButtonElement>("[data-quota]").forEach(b => b.classList.toggle("active", Number(b.dataset.quota) === quota)); document.querySelectorAll<HTMLButtonElement>("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === mode)); }
 function installKeyboardShortcuts() { document.removeEventListener("keydown", handleKeydown); document.addEventListener("keydown", handleKeydown); }
 function handleKeydown(event: KeyboardEvent) { const target = event.target as HTMLElement | null; if (target?.matches("input,textarea,select,[contenteditable='true']") || event.repeat) return; if (event.code === "Space") { event.preventDefault(); if (!answerVisible) showAnswer(); return; } if (["1","2","3","4"].includes(event.key) && answerVisible) { event.preventDefault(); void submitRating(Number(event.key) as Grade); } }
@@ -119,36 +158,14 @@ async function submitRating(rating: Grade) {
     const localReview = await review(word, rating);
     if (me) {
       try {
-        await api(`/reviews`, {
-          method: "POST",
-          body: JSON.stringify({
-            wordId: word.id,
-            rating,
-            reviewType: mode,
-            reviewId: localReview.reviewId,
-            reviewedAt: localReview.reviewedAt,
-            card: {
-              state: localReview.card.state,
-              stability: localReview.card.stability,
-              difficulty: localReview.card.difficulty,
-              dueAt: localReview.card.due.toISOString(),
-              reviewCount: localReview.card.reps,
-              wrongCount: localReview.card.lapses,
-              correctCount: Math.max(0, localReview.card.reps - localReview.card.lapses)
-            }
-          })
-        });
+        await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId: word.id, rating, reviewType: mode, reviewId: localReview.reviewId, reviewedAt: localReview.reviewedAt, card: { state: localReview.card.state, stability: localReview.card.stability, difficulty: localReview.card.difficulty, dueAt: localReview.card.due.toISOString(), reviewCount: localReview.card.reps, wrongCount: localReview.card.lapses, correctCount: Math.max(0, localReview.card.reps - localReview.card.lapses) } }) });
         syncError = "";
-      } catch {
-        syncError = "本次学习已保存在本地，但云端同步失败。请稍后重新登录或检查网络。";
-      }
+      } catch { syncError = "本次学习已保存在本地，但云端同步失败。请稍后重新登录或检查网络。"; }
     }
     markAnswered();
     answerVisible = false;
     await render();
-  } finally {
-    submittingReview = false;
-  }
+  } finally { submittingReview = false; }
 }
 
 async function render() {
