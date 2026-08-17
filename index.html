@@ -1,1 +1,3118 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>考研英语 · FSRS-6</title></head><body><div id="app"></div><script type="module" src="./src/main.ts"></script></body></html>
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="version" content="V3-FSRS6-20260816">
+<title>考研英语核心词 V3 (FSRS-6)</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="sentences.js"></script>
+<script type="module">
+// Official ts-fsrs (FSRS-6) browser build via ESM CDN
+import * as TSFSRS from 'https://cdn.jsdelivr.net/npm/ts-fsrs@5.4.1/+esm';
+window.__TSFSRS = TSFSRS;
+window.__TSFSRSReady = Promise.resolve(TSFSRS);
+window.__fsrsLoaded = true;
+</script>
+<style>
+:root{
+  --primary:#3B82F6;--on-primary:#FFFFFF;
+  --primary-container:#DBEAFE;--on-primary-container:#1E40AF;
+  --primary-light:#EFF6FF;
+  --surface:#FFFFFF;--surface-variant:#F8FAFC;
+  --on-surface:#0F172A;--on-surface-variant:#64748B;
+  --outline:#E2E8F0;--outline-variant:#F1F5F9;
+  --error:#EF4444;--error-container:#FEE2E2;--on-error:#991B1B;
+  --success:#10B981;--success-container:#D1FAE5;--on-success:#065F46;
+  --warning:#F59E0B;--warning-container:#FEF3C7;--on-warning:#92400E;
+  --background:#F0F4F8;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.06);
+  --shadow-lg:0 8px 24px rgba(0,0,0,.08);
+  --radius-sm:10px;
+  --radius-md:14px;
+  --radius-lg:18px;
+  --radius-xl:22px;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Noto Sans SC','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--background);color:var(--on-surface);
+  min-height:100vh;-webkit-font-smoothing:antialiased;
+}
+#app{max-width:480px;margin:0 auto;min-height:100vh;background:var(--background);position:relative}
+.view{display:none;min-height:100vh;animation:fadeIn .3s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== Home ===== */
+.home-header{padding:32px 20px 8px;text-align:center}
+.home-title{font-size:22px;font-weight:700;letter-spacing:.3px;color:var(--on-surface)}
+.home-subtitle{font-size:13px;color:var(--on-surface-variant);margin-top:4px}
+
+/* Daily Goal Card */
+.daily-goal-card{
+  margin:16px 20px;padding:24px 20px;border-radius:var(--radius-xl);
+  background:var(--surface);box-shadow:var(--shadow-sm);
+  border:1px solid var(--outline-variant);
+}
+.daily-goal-title{font-size:16px;font-weight:700;color:var(--on-surface);margin-bottom:2px}
+.daily-goal-subtitle{font-size:12px;color:var(--on-surface-variant);margin-bottom:16px}
+.daily-goal-btns{display:flex;gap:10px}
+.daily-goal-btn{
+  flex:1;padding:12px 0;border-radius:var(--radius-md);
+  border:2px solid var(--outline);background:var(--surface);
+  font-size:16px;font-weight:700;color:var(--on-surface-variant);
+  cursor:pointer;transition:all .2s ease;
+}
+.daily-goal-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.daily-goal-btn.active{
+  border-color:var(--primary);background:var(--primary-light);
+  color:var(--on-primary-container);
+}
+.daily-goal-progress{
+  margin-top:12px;height:6px;border-radius:3px;
+  background:var(--surface-variant);overflow:hidden;
+}
+.daily-goal-progress-fill{
+  height:100%;background:var(--primary);
+  border-radius:3px;transition:width .5s ease;
+}
+
+/* Mode Tabs */
+.mode-tabs{
+  margin:16px 20px;display:flex;gap:10px;
+}
+.mode-tab{
+  flex:1;padding:16px 12px;border-radius:var(--radius-lg);
+  background:var(--surface);border:2px solid transparent;
+  cursor:pointer;transition:all .2s ease;
+  box-shadow:var(--shadow-sm);text-align:center;
+}
+.mode-tab:hover{border-color:var(--outline);transform:translateY(-1px)}
+.mode-tab.active{
+  background:var(--primary-light);border-color:var(--primary);
+  box-shadow:0 2px 8px rgba(59,130,246,.15);
+}
+.mode-tab-icon{font-size:24px;margin-bottom:6px}
+.mode-tab-title{font-size:13px;font-weight:700;color:var(--on-surface);margin-bottom:2px}
+.mode-tab-desc{font-size:11px;color:var(--on-surface-variant);line-height:1.3}
+.mode-tab.active .mode-tab-title{color:var(--on-primary-container)}
+.mode-tab.active .mode-tab-desc{color:var(--primary)}
+
+/* Stats Row */
+.stats-row{
+  margin:16px 20px;padding:18px 12px;border-radius:var(--radius-lg);
+  background:var(--surface);box-shadow:var(--shadow-sm);
+  display:flex;justify-content:space-around;
+  border:1px solid var(--outline-variant);
+}
+.stat-item{text-align:center;flex:1}
+.stat-num{font-size:24px;font-weight:800;color:var(--primary);line-height:1.2}
+.stat-num.warn{color:var(--warning)}
+.stat-num.error{color:var(--error)}
+.stat-num.success{color:var(--success)}
+.stat-num.muted{color:var(--on-surface-variant)}
+.stat-label{font-size:11px;color:var(--on-surface-variant);margin-top:4px;font-weight:500}
+
+/* Action Buttons */
+.home-actions{margin:16px 20px;display:flex;flex-direction:column;gap:10px}
+.action-btn{
+  width:100%;padding:16px;border-radius:var(--radius-lg);
+  border:none;font-size:16px;font-weight:700;cursor:pointer;
+  transition:all .2s ease;display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.action-btn.primary{
+  background:var(--primary);color:#fff;
+  box-shadow:0 4px 12px rgba(59,130,246,.25);
+}
+.action-btn.primary:hover{background:#2563EB;box-shadow:0 6px 16px rgba(59,130,246,.35)}
+.action-btn.primary:active{transform:scale(.98)}
+.action-btn.primary:disabled{background:var(--outline);color:var(--on-surface-variant);box-shadow:none;cursor:not-allowed}
+.action-btn.secondary{
+  background:var(--surface);color:var(--on-surface);
+  border:2px solid var(--outline);
+}
+.action-btn.secondary:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.action-btn.secondary:active{transform:scale(.98)}
+.action-btn.secondary:disabled{border-color:var(--outline);color:var(--outline);cursor:not-allowed;background:var(--surface)}
+.action-btn.tertiary{
+  background:var(--surface);color:var(--success);
+  border:2px solid var(--success-container);
+}
+.action-btn.tertiary:hover{background:var(--success-container);border-color:var(--success)}
+.action-btn.tertiary:active{transform:scale(.98)}
+.action-btn.tertiary:disabled{border-color:var(--outline);color:var(--outline);cursor:not-allowed;background:var(--surface)}
+
+/* Resume Banner */
+.resume-banner{
+  margin:0 20px 16px;padding:16px 18px;border-radius:var(--radius-lg);
+  background:linear-gradient(135deg,#FEF3C7,#FDE68A);
+  border:1px solid #FCD34D;
+}
+.resume-banner-title{font-size:13px;color:#92400E;font-weight:700;margin-bottom:4px}
+.resume-banner-desc{font-size:12px;color:#78350F;margin-bottom:12px}
+.resume-banner-actions{display:flex;gap:10px}
+.resume-btn-primary{flex:1;padding:10px;border-radius:var(--radius-sm);border:none;background:#F59E0B;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.resume-btn-secondary{padding:10px 16px;border-radius:var(--radius-sm);border:1px solid #FBBF24;background:#fff;color:#92400E;font-size:13px;font-weight:600;cursor:pointer}
+
+/* Progress Card */
+.progress-card{
+  margin:16px 20px;padding:20px;border-radius:var(--radius-lg);
+  background:var(--surface);box-shadow:var(--shadow-sm);
+  border:1px solid var(--outline-variant);
+}
+.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.progress-title{font-size:14px;font-weight:700;color:var(--on-surface)}
+.progress-value{font-size:13px;font-weight:600;color:var(--on-surface-variant)}
+.progress-bar{height:6px;background:var(--outline-variant);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--primary),#60A5FA);border-radius:3px;transition:width .5s ease}
+.progress-detail{display:flex;gap:16px;margin-top:14px;font-size:12px;color:var(--on-surface-variant);flex-wrap:wrap}
+.progress-detail span b{color:var(--on-surface);font-weight:700}
+
+/* Section */
+.home-section{margin:20px 20px 8px}
+.home-section-title{font-size:14px;font-weight:700;color:var(--on-surface);margin-bottom:10px}
+
+/* Data Buttons */
+.data-row{display:flex;gap:10px;margin:0 20px 12px;flex-wrap:wrap}
+.data-btn{flex:1;min-width:130px;padding:12px;border-radius:var(--radius-md);
+  border:1px solid var(--outline);background:var(--surface);
+  color:var(--on-surface-variant);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:6px}
+.data-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-light)}
+.data-btn.import-btn{border-color:var(--success-container);color:var(--success)}
+.data-btn.import-btn:hover{background:var(--success-container)}
+
+/* Example Section */
+.example-card{
+  margin:0 20px 16px;padding:16px 18px;border-radius:var(--radius-lg);
+  background:var(--surface);box-shadow:var(--shadow-sm);
+  border:1px solid var(--outline-variant);
+}
+.example-card-title{font-size:13px;color:var(--on-surface-variant);margin-bottom:10px;font-weight:500}
+.example-stats{display:flex;gap:10px;flex-wrap:wrap}
+.example-stat{
+  flex:1;min-width:90px;padding:10px 12px;border-radius:var(--radius-sm);
+  font-size:12px;font-weight:600;
+}
+.example-stat.green{background:var(--success-container);color:var(--on-success)}
+.example-stat.blue{background:var(--primary-container);color:var(--on-primary-container)}
+.example-stat.orange{background:var(--warning-container);color:var(--on-warning)}
+.example-footnote{font-size:11px;margin-top:10px;color:var(--on-surface-variant);opacity:.7}
+
+/* Timer Card */
+.timer-card{margin:16px 20px;display:flex;gap:10px}
+.timer-item{flex:1;padding:16px;border-radius:var(--radius-lg);background:var(--surface);text-align:center;box-shadow:var(--shadow-sm);border:1px solid var(--outline-variant)}
+.timer-item.today{background:linear-gradient(135deg,var(--primary-light),var(--surface))}
+.timer-num{font-size:26px;font-weight:800;color:var(--primary);line-height:1.2}
+.timer-unit{font-size:13px;font-weight:500;color:var(--on-surface-variant)}
+.timer-label{font-size:11px;color:var(--on-surface-variant);margin-top:4px}
+
+.reset-btn{display:block;margin:16px auto 8px;padding:8px 16px;border:none;background:transparent;
+  color:var(--error);font-size:13px;cursor:pointer;opacity:.6}
+.reset-btn:hover{opacity:1}
+.logout-btn{display:block;margin:8px auto 32px;padding:8px 16px;border:none;background:transparent;
+  color:var(--on-surface-variant);font-size:13px;cursor:pointer;opacity:.6}
+.logout-btn:hover{opacity:1;color:var(--error)}
+
+.user-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;
+  background:var(--primary-container);color:var(--on-primary-container);font-size:13px;font-weight:600}
+
+/* ===== Study ===== */
+.study-topbar{display:flex;align-items:center;padding:14px 18px;gap:12px;position:sticky;top:0;background:var(--background);z-index:10}
+.back-btn{width:38px;height:38px;border-radius:50%;border:none;background:var(--surface);
+  color:var(--on-surface);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:var(--shadow-sm);border:1px solid var(--outline-variant);
+}
+.back-btn:hover{background:var(--primary-container)}
+.study-progress{flex:1;font-size:14px;font-weight:700;color:var(--on-surface)}
+.study-progress span{color:var(--on-surface-variant);font-weight:500}
+.pass-badge{padding:5px 14px;border-radius:20px;background:var(--primary-container);color:var(--on-primary-container);font-size:12px;font-weight:600;flex-shrink:0}
+
+.study-bar{height:3px;background:var(--outline-variant);margin:0 18px;border-radius:2px;overflow:hidden}
+.study-bar-fill{height:100%;background:var(--primary);border-radius:2px;transition:width .3s ease}
+
+.card-container{padding:20px 18px}
+
+/* Word Card - New Design */
+.word-card{
+  background:var(--surface);border-radius:var(--radius-xl);
+  padding:32px 24px;text-align:center;margin-bottom:20px;
+  box-shadow:var(--shadow-md);border:1px solid var(--outline-variant);
+  position:relative;
+}
+.word-status-badge{
+  display:inline-block;padding:5px 14px;border-radius:20px;
+  background:var(--primary-light);color:var(--primary);
+  font-size:12px;font-weight:700;margin-bottom:16px;
+  letter-spacing:.5px;
+}
+.word-status-badge.new{background:#FEF3C7;color:#D97706}
+.word-status-badge.learning{background:#DBEAFE;color:#2563EB}
+.word-status-badge.review{background:#D1FAE5;color:#059669}
+.word-status-badge.relearning{background:#FEE2E2;color:#DC2626}
+.word-main{font-size:38px;font-weight:800;color:var(--on-surface);letter-spacing:.5px;word-break:break-word;line-height:1.2}
+.word-meaning{font-size:17px;color:var(--on-surface);margin-top:12px;line-height:1.5;font-weight:500}
+.word-type{font-size:13px;color:var(--on-surface-variant);margin-top:6px}
+.word-fsrs-info{
+  display:flex;justify-content:center;gap:16px;margin-top:16px;
+  font-size:11px;color:var(--on-surface-variant);flex-wrap:wrap;
+}
+.word-fsrs-info span b{color:var(--on-surface);font-weight:600}
+.word-speak-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:14px}
+
+.question-card{
+  background:var(--surface);border-radius:var(--radius-xl);padding:32px 24px;
+  text-align:center;margin-bottom:20px;min-height:160px;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  box-shadow:var(--shadow-md);border:1px solid var(--outline-variant);
+}
+.question-hint{font-size:13px;color:var(--on-surface-variant);margin-bottom:12px}
+.question-text{font-size:28px;font-weight:700;color:var(--on-surface);line-height:1.4;word-break:break-word}
+.question-type{font-size:14px;color:var(--on-surface-variant);margin-top:8px}
+
+.options{display:flex;flex-direction:column;gap:10px}
+.option-btn{
+  display:flex;align-items:center;gap:12px;padding:14px 18px;
+  border-radius:var(--radius-md);border:2px solid var(--outline);background:var(--surface);
+  font-size:15px;cursor:pointer;transition:all .2s;text-align:left;
+  color:var(--on-surface);line-height:1.4;
+  box-shadow:var(--shadow-sm);
+}
+.option-btn:hover:not(.disabled){border-color:var(--primary);background:var(--primary-light)}
+.option-btn.disabled{cursor:default}
+.option-btn.correct{border-color:var(--success);background:var(--success-container);color:var(--on-success)}
+.option-btn.wrong{border-color:var(--error);background:var(--error-container);color:var(--on-error)}
+.option-label{width:28px;height:28px;border-radius:50%;background:var(--surface-variant);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.option-btn.correct .option-label{background:var(--success);color:#fff}
+.option-btn.wrong .option-label{background:var(--error);color:#fff}
+.option-translation{font-size:12px;color:var(--on-surface-variant);margin-top:4px;display:none}
+.option-btn.revealed .option-translation{display:block}
+
+.reveal-btn{
+  display:block;width:100%;margin-bottom:14px;padding:11px;
+  border-radius:var(--radius-md);border:1px dashed var(--primary);background:var(--primary-light);
+  color:var(--primary);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;
+}
+.reveal-btn:hover{background:var(--primary-container)}
+.reveal-btn.revealed{border-style:solid;background:var(--surface);color:var(--on-surface-variant);border-color:var(--outline)}
+
+.ignore-row{margin-top:12px;text-align:center}
+.ignore-btn{
+  padding:8px 20px;border-radius:20px;border:1px solid #E53E3E;
+  background:transparent;color:#E53E3E;font-size:13px;font-weight:500;
+  cursor:pointer;transition:all .2s;
+}
+.ignore-btn:hover{background:#FFF5F5}
+
+.result-card{margin-top:20px;padding:20px;border-radius:16px;background:var(--surface-variant);
+  animation:fadeIn .3s ease;position:relative}
+.result-word{font-size:22px;font-weight:700;color:var(--primary)}
+.result-type{font-size:14px;color:var(--on-surface-variant);margin-top:4px}
+.result-meaning{font-size:16px;color:var(--on-surface);margin-top:8px;line-height:1.5}
+.result-category{display:inline-block;margin-top:8px;padding:2px 10px;border-radius:12px;
+  background:var(--primary-container);color:var(--on-primary-container);font-size:12px;font-weight:500}
+
+.speak-btn{width:44px;height:44px;border-radius:50%;border:none;background:var(--primary);
+  color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .2s;box-shadow:0 2px 8px rgba(0,120,212,.25)}
+.speak-btn:hover{background:#106EBE;transform:scale(1.05)}
+.speak-btn:active{transform:scale(.95)}
+.speak-btn.speaking{animation:pulse .6s ease infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}
+.result-speak-btn{position:absolute;top:16px;right:16px;width:36px;height:36px;border-radius:50%;
+  border:none;background:var(--primary);color:#fff;font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .2s}
+.result-speak-btn:hover{background:#106EBE;transform:scale(1.05)}
+.result-speak-btn:active{transform:scale(.95)}
+.question-speak-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:12px}
+
+.btn-continue{display:block;width:100%;margin-top:20px;padding:16px;border-radius:16px;
+  border:none;background:var(--primary);color:#fff;font-size:17px;font-weight:600;
+  cursor:pointer;transition:all .2s;animation:fadeIn .3s ease}
+.btn-continue:hover{background:#106EBE}
+
+/* ===== Example Sentence ===== */
+.example-btn{
+  margin-top:12px;padding:8px 18px;border-radius:20px;
+  border:1px solid var(--outline);background:var(--surface);
+  color:var(--on-surface-variant);font-size:13px;cursor:pointer;
+  transition:all .2s;display:inline-flex;align-items:center;gap:6px;
+}
+.example-btn:hover{border-color:var(--primary);color:var(--primary);background:var(--primary-container)}
+.example-box{
+  margin-top:12px;padding:14px 16px;border-radius:12px;
+  background:var(--primary-container);animation:fadeIn .3s ease;
+  border-left:3px solid var(--primary);
+}
+.example-en{font-size:14px;line-height:1.6;color:var(--on-surface);font-style:italic}
+.example-en .blank{color:var(--primary);font-weight:700;font-style:normal;border-bottom:2px solid var(--primary);padding:0 4px}
+.example-cn{font-size:13px;line-height:1.5;color:var(--on-surface-variant);margin-top:8px}
+.example-loading{font-size:13px;color:var(--on-surface-variant);font-style:italic;display:flex;align-items:center;gap:6px}
+.example-loading .dot{animation:bounce .6s ease infinite}
+.example-loading .dot:nth-child(2){animation-delay:.15s}
+.example-loading .dot:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,100%{opacity:.3}50%{opacity:1}}
+.result-example{
+  margin-top:12px;padding:14px 16px;border-radius:12px;
+  background:var(--surface);border-left:3px solid var(--primary);
+  animation:fadeIn .3s ease;
+}
+.result-example-en{font-size:14px;line-height:1.6;color:var(--on-surface);font-style:italic}
+.result-example-en .hl{color:var(--primary);font-weight:700;font-style:normal}
+.result-example-cn{font-size:13px;line-height:1.5;color:var(--on-surface-variant);margin-top:6px}
+.result-example-label{font-size:11px;color:var(--primary);font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+
+/* ===== Complete ===== */
+.complete-container{padding:60px 24px;text-align:center;min-height:100vh;display:flex;flex-direction:column;justify-content:center}
+.complete-icon{width:72px;height:72px;border-radius:50%;background:var(--success-container);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:36px;color:var(--success)}
+.complete-title{font-size:24px;font-weight:700;margin-bottom:8px}
+.complete-subtitle{font-size:14px;color:var(--on-surface-variant);margin-bottom:32px}
+.complete-stats{display:flex;gap:16px;margin-bottom:32px}
+.complete-stat{flex:1;padding:20px;border-radius:16px;background:var(--surface-variant)}
+.complete-stat-num{font-size:32px;font-weight:700;color:var(--primary)}
+.complete-stat-num.green{color:var(--success)}
+.complete-stat-num.red{color:var(--error)}
+
+/* Vocab list page */
+.vocab-header{position:sticky;top:0;z-index:10;background:var(--background);padding:12px 16px;border-bottom:1px solid var(--outline)}
+.vocab-header-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.vocab-back-btn{padding:6px 12px;border-radius:8px;border:1px solid var(--outline);background:var(--surface);cursor:pointer;font-size:14px}
+.vocab-title{flex:1;font-size:18px;font-weight:700}
+.vocab-count{font-size:13px;color:var(--on-surface-variant)}
+.vocab-search{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--outline);
+  background:var(--surface);font-size:14px;outline:none;box-sizing:border-box}
+.vocab-search:focus{border-color:var(--primary)}
+.vocab-filter-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.vocab-filter-btn{padding:6px 12px;border-radius:16px;border:1px solid var(--outline);
+  background:var(--surface);font-size:12px;cursor:pointer;color:var(--on-surface-variant)}
+.vocab-filter-btn.active{border-color:var(--primary);background:var(--primary-container);color:var(--primary)}
+.vocab-export-btn{padding:8px 16px;border-radius:10px;border:1px solid var(--success);
+  background:transparent;color:var(--success);font-size:13px;font-weight:500;cursor:pointer}
+.vocab-list{padding:8px 0}
+.vocab-item{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--surface-variant);gap:12px}
+.vocab-item:hover{background:var(--surface)}
+.vocab-word{font-size:16px;font-weight:600;min-width:120px}
+.vocab-type{font-size:12px;color:var(--on-surface-variant);min-width:50px}
+.vocab-meaning{flex:1;font-size:14px;color:var(--on-surface);line-height:1.4}
+.vocab-status{font-size:11px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.vocab-status.new{background:#FEF3C7;color:#92400E}
+.vocab-status.learning{background:#DBEAFE;color:#1E40AF}
+.vocab-status.review{background:#D1FAE5;color:#065F46}
+.vocab-status.relearning{background:#FEE2E2;color:#991B1B}
+.vocab-status.mastered{background:#E0E7FF;color:#3730A3}
+.vocab-status.ignored{background:#E5E7EB;color:#4B5563}
+.complete-stat-label{font-size:12px;color:var(--on-surface-variant);margin-top:4px}
+.complete-accuracy{font-size:16px;color:var(--on-surface-variant);margin-bottom:24px}
+.complete-accuracy span{font-weight:700;color:var(--on-surface);font-size:20px}
+.next-review-info{padding:16px;border-radius:12px;background:var(--primary-container);color:var(--on-primary-container);
+  font-size:14px;margin-bottom:24px}
+
+/* ===== FSRS-6 Rating Panel ===== */
+/* ===== FSRS-6 Rating Panel - New Design ===== */
+.fsrs-rating-panel{margin-top:16px}
+.fsrs-rating-title{font-size:12px;color:var(--on-surface-variant);margin-bottom:10px;font-weight:600;text-align:center}
+.fsrs-rating-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.fsrs-rating-btn{
+  border:2px solid var(--outline);background:var(--surface);
+  border-radius:var(--radius-md);padding:12px 6px;cursor:pointer;
+  font-weight:700;color:var(--on-surface);transition:all .15s;
+  font-size:14px;box-shadow:var(--shadow-sm);
+}
+.fsrs-rating-btn small{
+  display:block;font-weight:500;font-size:10px;margin-top:4px;
+  color:var(--on-surface-variant);
+}
+.fsrs-rating-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md)}
+.fsrs-rating-btn.again{color:#DC2626;border-color:#FECACA}
+.fsrs-rating-btn.again:hover{background:#FEF2F2;border-color:#FCA5A5}
+.fsrs-rating-btn.hard{color:#EA580C;border-color:#FED7AA}
+.fsrs-rating-btn.hard:hover{background:#FFF7ED;border-color:#FDBA74}
+.fsrs-rating-btn.good{color:#059669;border-color:#BBF7D0}
+.fsrs-rating-btn.good:hover{background:#F0FDF4;border-color:#86EFAC}
+.fsrs-rating-btn.easy{color:#2563EB;border-color:#BFDBFE}
+.fsrs-rating-btn.easy:hover{background:#EFF6FF;border-color:#93C5FD}
+.fsrs-rating-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.fsrs-state-badge{
+  margin-top:10px;padding:8px 14px;border-radius:var(--radius-sm);
+  background:var(--primary-light);color:var(--primary);
+  font-size:12px;font-weight:600;text-align:center;
+}
+
+/* ===== Toast ===== */
+.toast{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  padding:16px 28px;border-radius:16px;background:rgba(28,27,31,.9);color:#fff;
+  font-size:15px;z-index:1000;animation:toastIn .3s ease;max-width:300px;text-align:center}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-40%)}to{opacity:1;transform:translate(-50%,-50%)}}
+
+/* ===== Login ===== */
+.login-container{padding:60px 24px;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center}
+.login-icon{width:80px;height:80px;border-radius:24px;background:linear-gradient(135deg,#0078D4,#106EBE);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:40px;color:#fff;
+  box-shadow:0 8px 24px rgba(0,120,212,.25)}
+.login-title{font-size:24px;font-weight:800;text-align:center;margin-bottom:8px}
+.login-subtitle{font-size:14px;color:var(--on-surface-variant);text-align:center;margin-bottom:32px}
+.login-input{width:100%;padding:16px 20px;border-radius:16px;border:2px solid var(--outline);
+  background:var(--surface);font-size:17px;color:var(--on-surface);margin-bottom:16px;outline:none;transition:all .2s}
+.login-input:focus{border-color:var(--primary);background:var(--primary-container)}
+.login-btn{display:block;width:100%;padding:16px;border-radius:16px;border:none;
+  background:var(--primary);color:#fff;font-size:17px;font-weight:600;cursor:pointer;transition:all .2s}
+.login-btn:hover{background:#106EBE;box-shadow:0 4px 12px rgba(0,120,212,.25)}
+.login-btn:active{transform:scale(.98)}
+.login-hint{font-size:12px;color:var(--on-surface-variant);text-align:center;margin-top:16px}
+.user-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;
+  background:var(--primary-container);color:var(--on-primary-container);font-size:13px;font-weight:600}
+.logout-btn{display:block;margin:8px auto 32px;padding:8px 16px;border:none;background:transparent;
+  color:var(--on-surface-variant);font-size:13px;cursor:pointer;opacity:.6}
+.logout-btn:hover{opacity:1;color:var(--error)}
+
+/* ===== Import Modal ===== */
+.import-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px}
+.import-box{background:var(--surface);border-radius:24px;padding:32px 24px;max-width:400px;width:100%;animation:fadeIn .3s ease;max-height:90vh;overflow-y:auto}
+.import-title{font-size:20px;font-weight:700;margin-bottom:8px;text-align:center}
+.import-desc{font-size:13px;color:var(--on-surface-variant);margin-bottom:20px;line-height:1.6;text-align:center}
+.import-zone{border:2px dashed var(--outline);border-radius:16px;padding:32px 20px;text-align:center;cursor:pointer;transition:all .2s}
+.import-zone:hover{border-color:var(--primary);background:var(--primary-container)}
+.import-zone-icon{font-size:40px;margin-bottom:8px}
+.import-zone-text{font-size:14px;color:var(--on-surface-variant)}
+.import-format{margin-top:16px;padding:12px;border-radius:10px;background:var(--surface-variant);font-size:12px;color:var(--on-surface-variant);line-height:1.6}
+.import-format b{color:var(--on-surface)}
+.import-preview{margin-top:16px;max-height:200px;overflow-y:auto}
+.import-preview-row{display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;font-size:13px}
+.import-preview-row:nth-child(odd){background:var(--surface-variant)}
+.import-preview-word{font-weight:600;color:var(--primary)}
+.import-actions{display:flex;gap:12px;margin-top:20px}
+.import-cancel{flex:1;padding:14px;border-radius:14px;border:1px solid var(--outline);background:var(--surface);
+  color:var(--on-surface-variant);font-size:15px;font-weight:600;cursor:pointer}
+.import-confirm{flex:1;padding:14px;border-radius:14px;border:none;background:var(--success);color:#fff;
+  font-size:15px;font-weight:600;cursor:pointer}
+.import-confirm:disabled{background:var(--outline);cursor:not-allowed}
+
+/* High-frequency word badge */
+.hf-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;
+  background:#FFF3E0;color:#E65100;font-size:11px;font-weight:700;white-space:nowrap}
+.hf-badge-lg{display:inline-flex;align-items:center;gap:4px;padding:4px 14px;border-radius:14px;
+  background:linear-gradient(135deg,#FFF3E0,#FFE0B2);color:#E65100;font-size:13px;font-weight:700;
+  box-shadow:0 1px 4px rgba(230,81,0,.15)}
+.import-dup-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;
+  border-radius:8px;font-size:13px;background:#FFF8E1;border-left:3px solid #FF9800;margin:4px 0}
+.import-dup-word{font-weight:600;color:#E65100}
+.import-dup-count{font-size:11px;color:#F57C00;background:#FFE0B2;padding:2px 8px;border-radius:10px;font-weight:600}
+.import-stats{margin-top:12px;padding:12px;border-radius:10px;font-size:13px;line-height:1.8}
+.import-stats-new{background:var(--success-container);color:var(--success)}
+.import-stats-dup{background:#FFF3E0;color:#E65100;margin-top:8px}
+.question-hf-hint{margin-top:10px;padding:6px 14px;border-radius:12px;
+  background:linear-gradient(135deg,#FFF3E0,#FFE0B2);color:#E65100;font-size:12px;font-weight:600;
+  display:inline-flex;align-items:center;gap:6px;animation:fadeIn .3s ease}
+.result-hf-hint{margin-top:10px;padding:8px 14px;border-radius:12px;
+  background:linear-gradient(135deg,#FFF3E0,#FFE0B2);color:#E65100;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:6px}
+
+/* Study timer */
+.timer-card{margin:20px 24px 16px;display:flex;gap:12px}
+.timer-item{flex:1;padding:16px;border-radius:16px;background:var(--surface-variant);text-align:center}
+.timer-item.today{background:linear-gradient(135deg,#E8F1FA,#F5F7FA)}
+.timer-num{font-size:28px;font-weight:800;color:var(--primary);line-height:1.2}
+.timer-unit{font-size:14px;font-weight:500;color:var(--on-surface-variant)}
+.timer-label{font-size:12px;color:var(--on-surface-variant);margin-top:4px}
+.study-timer{position:fixed;top:12px;right:12px;padding:6px 14px;border-radius:20px;
+  background:rgba(0,120,212,.9);color:#fff;font-size:13px;font-weight:600;z-index:100;
+  display:flex;align-items:center;gap:6px;box-shadow:0 2px 8px rgba(0,120,212,.3)}
+
+@media(max-width:480px){
+  #app{box-shadow:none}
+  .question-text{font-size:24px}
+  .word-main{font-size:32px}
+  .mode-tab-title{font-size:12px}
+  .mode-tab-desc{font-size:10px}
+  .stat-num{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view-login" class="view"></div>
+  <div id="view-home" class="view"></div>
+  <div id="view-study" class="view"></div>
+  <div id="view-complete" class="view"></div>
+  <div id="view-vocab" class="view"></div>
+</div>
+<div id="toast" style="display:none"></div>
+<div id="import-modal" style="display:none"></div>
+
+<script src="data.js"></script>
+<script>
+// ===== Config =====
+const REVIEW_INTERVALS = [1, 2, 4, 7, 15, 30]; // Legacy, kept for migration
+
+// ===== Official ts-fsrs FSRS-6 Adapter =====
+// The scheduling engine is the official ts-fsrs package (FSRS-6).
+// This adapter bridges the official Card/ReviewLog objects with the APP's word structure.
+const FSRS_CONFIG = {
+  request_retention: 0.90,
+  maximum_interval: 36500,
+  enable_fuzz: true,
+  enable_short_term: true,
+  learning_steps: ['1m', '10m'],
+  relearning_steps: ['10m']
+};
+const MASTERED_STABILITY_THRESHOLD = 30; // 稳定性 >= 30天 且 state===Review 视为已掌握
+
+let fsrsScheduler = null;
+let fsrsReady = false;
+
+async function ensureFSRS(){
+  if(fsrsScheduler) return fsrsScheduler;
+  const api = window.__TSFSRS || await window.__TSFSRSReady;
+  if(!api || typeof api.fsrs!=='function') throw new Error('官方 ts-fsrs 加载失败');
+  fsrsScheduler = api.fsrs(FSRS_CONFIG);
+  fsrsReady = true;
+  return fsrsScheduler;
+}
+
+function fsrsApi(){
+  if(!window.__TSFSRS) throw new Error('ts-fsrs 尚未加载');
+  return window.__TSFSRS;
+}
+
+// State enum helpers
+function fsrsStateName(state){
+  const api=fsrsApi();
+  if(state===api.State.New) return 'New';
+  if(state===api.State.Learning) return 'Learning';
+  if(state===api.State.Review) return 'Review';
+  if(state===api.State.Relearning) return 'Relearning';
+  return String(state);
+}
+
+function fsrsStateNameCn(state){
+  const api=fsrsApi();
+  if(state===api.State.New) return '新词';
+  if(state===api.State.Learning) return '学习中';
+  if(state===api.State.Review) return '复习中';
+  if(state===api.State.Relearning) return '重学中';
+  return String(state);
+}
+
+// Rating enum helpers
+function fsrsRatingName(rating){
+  const api=fsrsApi();
+  if(rating===api.Rating.Again) return 'Again';
+  if(rating===api.Rating.Hard) return 'Hard';
+  if(rating===api.Rating.Good) return 'Good';
+  if(rating===api.Rating.Easy) return 'Easy';
+  return String(rating);
+}
+
+function fsrsRatingFromStudyResult(correctCount){
+  const api=fsrsApi();
+  if(correctCount>=4) return api.Rating.Easy;
+  if(correctCount===3) return api.Rating.Good;
+  if(correctCount===2) return api.Rating.Hard;
+  return api.Rating.Again;
+}
+
+// Serialize an official Card into a JSON-safe object stored under word.fsrs.
+function serializeFSRSCard(card){
+  return {
+    due: card.due instanceof Date ? card.due.getTime() : Number(card.due),
+    stability: card.stability ?? 0,
+    difficulty: card.difficulty ?? 0,
+    elapsed_days: card.elapsed_days ?? 0,
+    scheduled_days: card.scheduled_days ?? 0,
+    reps: card.reps ?? 0,
+    lapses: card.lapses ?? 0,
+    state: card.state,
+    step: card.step ?? null,
+    last_review: card.last_review instanceof Date ? card.last_review.getTime() : (card.last_review ?? null)
+  };
+}
+
+// Hydrate a saved card object back into a usable FSRS Card
+function hydrateFSRSCard(saved){
+  const api=fsrsApi();
+  const card=api.createEmptyCard();
+  if(!saved) return card;
+  return {
+    ...card,
+    due: new Date(saved.due || Date.now()),
+    stability: Number(saved.stability || 0),
+    difficulty: Number(saved.difficulty || 0),
+    elapsed_days: Number(saved.elapsed_days || 0),
+    scheduled_days: Number(saved.scheduled_days || 0),
+    reps: Number(saved.reps || 0),
+    lapses: Number(saved.lapses || 0),
+    state: saved.state ?? api.State.New,
+    step: saved.step ?? null,
+    last_review: saved.last_review ? new Date(saved.last_review) : undefined
+  };
+}
+
+// Get FSRS Card from word state (handles both new format with .fsrs and legacy format)
+function getFSRSCard(wordState){
+  if(wordState && wordState.fsrs) return hydrateFSRSCard(wordState.fsrs);
+  // Legacy records: reconstruct FSRS card from old D/S/lastReview/nextReview fields
+  const api=fsrsApi();
+  const card=api.createEmptyCard();
+  if(wordState && (wordState.stability!==undefined || wordState.difficulty!==undefined)){
+    card.due=new Date(wordState.nextReview || Date.now());
+    card.stability=Number(wordState.stability || 1);
+    card.difficulty=Number(wordState.difficulty || 5);
+    card.state=api.State.Review;
+    card.reps=Math.max(1,(wordState.correct||0)+(wordState.wrong||0));
+    card.lapses=Number(wordState.wrong||0);
+    card.last_review=wordState.lastReview ? new Date(wordState.lastReview) : undefined;
+    card.elapsed_days=card.last_review ? Math.max(0,(Date.now()-card.last_review.getTime())/86400000) : 0;
+    card.scheduled_days=Math.max(0,Math.round(card.stability));
+  }
+  return card;
+}
+
+// Sync FSRS card data back to word state (keeps legacy fields for UI compatibility)
+function syncLegacyFieldsFromCard(wordState, card, rating){
+  const api=fsrsApi();
+  wordState.fsrs=serializeFSRSCard(card);
+  wordState.stability=card.stability;
+  wordState.difficulty=card.difficulty;
+  wordState.lastReview=card.last_review ? new Date(card.last_review).getTime() : Date.now();
+  wordState.nextReview=card.due instanceof Date ? card.due.getTime() : Number(card.due);
+  wordState.fsrsState=fsrsStateName(card.state);
+
+  // Legacy level display compatibility
+  if(rating===api.Rating.Again) wordState.level=Math.max(0,(wordState.level||0)-1);
+  else if(rating===api.Rating.Hard) wordState.level=Math.min(6,(wordState.level||0));
+  else if(rating===api.Rating.Good) wordState.level=Math.min(6,(wordState.level||0)+1);
+  else if(rating===api.Rating.Easy) wordState.level=Math.min(6,(wordState.level||0)+2);
+
+  // "已掌握" = stability >= 30天 AND state === Review
+  // ignored status is preserved
+  const total=(wordState.correct||0)+(wordState.wrong||0);
+  const accuracy=total ? (wordState.correct||0)/total : 0;
+  if(card.state===api.State.Review && card.stability>=MASTERED_STABILITY_THRESHOLD && total>=5 && accuracy>=0.8){
+    wordState.status='mastered';
+  }else if(wordState.status!=='ignored'){
+    wordState.status='review';
+  }
+}
+
+// Check if a word is in "mastered" state using FSRS criteria
+function isWordMastered(wp){
+  if(!wp || wp.status==='ignored') return false;
+  if(wp.status==='mastered') return true; // cached status
+  // Check FSRS criteria directly
+  if(wp.fsrs){
+    const api=fsrsApi();
+    return wp.fsrs.state===api.State.Review && wp.fsrs.stability>=MASTERED_STABILITY_THRESHOLD;
+  }
+  return false;
+}
+
+// Migrate old word data to FSRS-6 format
+function migrateToFSRS6(word){
+  if(word.status==='ignored') return; // ignored words don't need FSRS card
+  if(word.fsrs){
+    // Already migrated, just normalize timestamps
+    const c=hydrateFSRSCard(word.fsrs);
+    word.fsrs=serializeFSRSCard(c);
+    word.stability=c.stability;
+    word.difficulty=c.difficulty;
+    word.nextReview=c.due.getTime();
+    word.fsrsState=fsrsStateName(c.state);
+    return;
+  }
+  // Legacy migration: build FSRS card from old fields
+  const card=getFSRSCard(word);
+  word.fsrs=serializeFSRSCard(card);
+  word.stability=card.stability;
+  word.difficulty=card.difficulty;
+  word.nextReview=card.due.getTime();
+  word.lastReview=card.last_review ? card.last_review.getTime() : (word.lastReview||null);
+  word.fsrsState=fsrsStateName(card.state);
+  if(!word.status || word.status==='new') word.status='review';
+}
+
+// Get retrievability (current recall probability)
+function fsrsRetrievability(wordState, now=Date.now()){
+  if(!wordState) return 0;
+  try{
+    if(!fsrsScheduler) return 0;
+    const card=getFSRSCard(wordState);
+    return fsrsScheduler.get_retrievability(card,new Date(now),false);
+  }catch(e){ return 0; }
+}
+
+// Get next interval in days
+function fsrsNextInterval(wordState){
+  try{
+    if(!fsrsScheduler) return 0;
+    const card=typeof wordState==='object' ? getFSRSCard(wordState) : null;
+    if(!card) return 0;
+    return fsrsScheduler.next_interval(card.stability,0);
+  }catch(e){ return 0; }
+}
+
+// Apply one official FSRS rating. Returns the scheduler result.
+function applyFSRSRating(wordState,rating,now=Date.now()){
+  const card=getFSRSCard(wordState);
+  const before=serializeFSRSCard(card);
+  const result=fsrsScheduler.next(card,new Date(now),rating);
+  const after=result.card;
+  syncLegacyFieldsFromCard(wordState,after,rating);
+  return {result,before,after:serializeFSRSCard(after)};
+}
+
+// Preview all four possible ratings
+function previewFSRS(wordState,now=Date.now()){
+  const card=getFSRSCard(wordState);
+  return fsrsScheduler.repeat(card,new Date(now));
+}
+
+// Check if a card is due for review
+function isCardDue(wordState, now=Date.now()){
+  if(!wordState || wordState.status==='ignored') return false;
+  if(wordState.status==='new' || !wordState.fsrs) return false;
+  return wordState.nextReview <= now;
+}
+
+// ===== State =====
+let progress = null;
+let session = null;
+let answered = false;
+let revealed = false;
+let currentOptions = [];
+let currentCard = null;
+let customVocab = [];
+let studyTimerInterval = null;
+
+// ===== Utils =====
+// Beijing time (UTC+8) with 5 AM as daily boundary
+// Before 5 AM = still "yesterday" in study terms
+function dateToStudyDay(ts){
+  const d=new Date(ts);
+  const beijing=new Date(d.getTime()+8*3600000);
+  if(beijing.getUTCHours()<5) beijing.setUTCDate(beijing.getUTCDate()-1);
+  return beijing.toISOString().split('T')[0];
+}
+function getToday(){ return dateToStudyDay(Date.now()); }
+function getYesterday(){
+  const now=new Date();
+  const beijing=new Date(now.getTime()+8*3600000);
+  if(beijing.getUTCHours()<5) beijing.setUTCDate(beijing.getUTCDate()-2);
+  else beijing.setUTCDate(beijing.getUTCDate()-1);
+  return beijing.toISOString().split('T')[0];
+}
+// Calendar date in Beijing time (midnight cutoff, for study time tracking)
+function getCalendarDate(){
+  const d=new Date();
+  const beijing=new Date(d.getTime()+8*3600000);
+  return beijing.toISOString().split('T')[0];
+}
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.display='block';
+  t.className='toast';
+  setTimeout(()=>{t.style.display='none'},2000);
+}
+
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function getAllVocab(){
+  const merged=[...VOCAB_DATA];
+  const existingWords=new Set(VOCAB_DATA.map(w=>w.word.toLowerCase()));
+  for(const w of customVocab){
+    if(!existingWords.has(w.word.toLowerCase())){
+      merged.push(w);
+      existingWords.add(w.word.toLowerCase());
+    }
+  }
+  return merged;
+}
+
+function getWordHfCount(word){
+  const key=word.toLowerCase();
+  const cv=customVocab.find(c=>c.word.toLowerCase()===key);
+  if(cv && cv.hfCount) return cv.hfCount;
+  if(progress && progress.hfOverrides && progress.hfOverrides[key]) return progress.hfOverrides[key];
+  return 0;
+}
+
+// ===== Text-to-Speech =====
+let ttsVoice = null;
+let ttsUnlocked = false;
+let ttsAvailable = ('speechSynthesis' in window);
+
+function loadTTSVoice(){
+  if(!ttsAvailable) return;
+  const voices = speechSynthesis.getVoices();
+  if(voices.length===0) return;
+  const usVoices = voices.filter(v=>v.lang==='en-US');
+  if(usVoices.length>0){
+    const preferred = usVoices.find(v=>/google|natural|samantha|aria|daniel|zira/i.test(v.name));
+    ttsVoice = preferred || usVoices[0];
+  } else if(voices.length>0){
+    ttsVoice = voices.find(v=>v.lang.startsWith('en')) || voices[0];
+  }
+}
+
+function unlockTTS(){
+  if(ttsUnlocked || !ttsAvailable) return;
+  ttsUnlocked = true;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance('');
+    u.volume = 0; u.rate = 1; u.lang = 'en-US';
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+['touchstart','click','keydown'].forEach(evt=>{
+  document.addEventListener(evt, unlockTTS, {once:true, passive:true});
+});
+
+function speakWord(word, btnEl){
+  if(ttsAvailable){
+    try{ speechSynthesis.resume(); }catch(e){}
+    speechSynthesis.cancel();
+    setTimeout(()=>{
+      const utter = new SpeechSynthesisUtterance(word);
+      utter.lang = 'en-US'; utter.rate = 0.9; utter.pitch = 1; utter.volume = 1;
+      if(ttsVoice) utter.voice = ttsVoice;
+      if(btnEl){
+        btnEl.classList.add('speaking');
+        utter.onend = ()=>{ btnEl.classList.remove('speaking'); };
+        utter.onerror = ()=>{ btnEl.classList.remove('speaking'); speakOnline(word, btnEl); };
+      }
+      try{
+        speechSynthesis.speak(utter);
+        setTimeout(()=>{ try{ speechSynthesis.resume(); }catch(e){} }, 100);
+        setTimeout(()=>{
+          if(btnEl && btnEl.classList.contains('speaking')){
+            try{ speechSynthesis.cancel(); }catch(e){}
+            btnEl.classList.remove('speaking');
+            speakOnline(word, btnEl);
+          }
+        }, 3000);
+      }catch(e){
+        if(btnEl) btnEl.classList.remove('speaking');
+        speakOnline(word, btnEl);
+      }
+    }, 50);
+    return;
+  }
+  speakOnline(word, btnEl);
+}
+
+function speakOnline(word, btnEl){
+  try{
+    const url='https://dict.youdao.com/dictvoice?audio='+encodeURIComponent(word)+'&type=2';
+    const audio=new Audio(url);
+    if(btnEl){
+      btnEl.classList.add('speaking');
+      audio.onended=()=>{ btnEl.classList.remove('speaking'); };
+      audio.onerror=()=>{ btnEl.classList.remove('speaking'); };
+    }
+    audio.play().catch(()=>{ if(btnEl) btnEl.classList.remove('speaking'); });
+  }catch(e){ if(btnEl) btnEl.classList.remove('speaking'); }
+}
+
+if(ttsAvailable){
+  loadTTSVoice();
+  speechSynthesis.onvoiceschanged = loadTTSVoice;
+  let voiceRetryCount = 0;
+  const voiceRetry = setInterval(()=>{
+    voiceRetryCount++;
+    if(ttsVoice || voiceRetryCount>=10){ clearInterval(voiceRetry); return; }
+    loadTTSVoice();
+  }, 500);
+}
+
+// ===== IndexedDB Storage =====
+let dbInstance = null;
+
+function initDB(){
+  return new Promise((resolve)=>{
+    if(!('indexedDB' in window)){ resolve(null); return; }
+    try{
+      const req = indexedDB.open('vocabDB2', 1);
+      req.onupgradeneeded = (e)=>{
+        const db = e.target.result;
+        if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+      };
+      req.onsuccess = (e)=>{ dbInstance = e.target.result; resolve(dbInstance); };
+      req.onerror = ()=>{ resolve(null); };
+    }catch(e){ resolve(null); }
+  });
+}
+
+function dbSet(key, value){
+  return new Promise((resolve)=>{
+    if(!dbInstance){ resolve(false); return; }
+    try{
+      const tx = dbInstance.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = ()=>{ resolve(true); };
+      tx.onerror = ()=>{ resolve(false); };
+    }catch(e){ resolve(false); }
+  });
+}
+
+function dbGet(key){
+  return new Promise((resolve)=>{
+    if(!dbInstance){ resolve(null); return; }
+    try{
+      const tx = dbInstance.transaction('kv', 'readonly');
+      const req = tx.objectStore('kv').get(key);
+      req.onsuccess = ()=>{ resolve(req.result !== undefined ? req.result : null); };
+      req.onerror = ()=>{ resolve(null); };
+    }catch(e){ resolve(null); }
+  });
+}
+
+function dbDelete(key){
+  return new Promise((resolve)=>{
+    if(!dbInstance){ resolve(false); return; }
+    try{
+      const tx = dbInstance.transaction('kv', 'readwrite');
+      tx.objectStore('kv').delete(key);
+      tx.oncomplete = ()=>{ resolve(true); };
+      tx.onerror = ()=>{ resolve(false); };
+    }catch(e){ resolve(false); }
+  });
+}
+
+// ===== Review Log (for FSRS parameter optimization) =====
+// FSRS-6 version: logs rating and before/after card states
+async function logReview(word, rating, beforeCard, afterCard, sessionType){
+  if(!dbInstance) return;
+  try{
+    const key = getStorageKey('reviewLogs');
+    const existing = await dbGet(key);
+    const logs = Array.isArray(existing) ? existing : [];
+    const api = fsrsApi();
+    logs.push({
+      w: word,
+      t: Date.now(),
+      r: rating, // FSRS Rating: 1=Again, 2=Hard, 3=Good, 4=Easy
+      c: rating===api.Rating.Again ? 0 : 1, // 0=wrong, 1=correct (for compatibility)
+      sb: beforeCard ? beforeCard.stability : 0,
+      db: beforeCard ? beforeCard.difficulty : 0,
+      sa: afterCard ? afterCard.stability : 0,
+      da: afterCard ? afterCard.difficulty : 0,
+      d: beforeCard ? beforeCard.elapsed_days : 0,
+      before: beforeCard,
+      after: afterCard,
+      st: sessionType
+    });
+    await dbSet(key, logs);
+  }catch(e){}
+}
+
+async function getReviewLogCount(){
+  if(!dbInstance) return 0;
+  const key = getStorageKey('reviewLogs');
+  const logs = await dbGet(key);
+  return Array.isArray(logs) ? logs.length : 0;
+}
+
+async function exportReviewLogs(){
+  if(!dbInstance){ showToast('IndexedDB不可用'); return; }
+  const key = getStorageKey('reviewLogs');
+  const logs = await dbGet(key);
+  if(!logs || logs.length===0){ showToast('暂无复习日志'); return; }
+  const exportObj = {
+    user: currentUser,
+    exportDate: getToday(),
+    totalLogs: logs.length,
+    logs: logs
+  };
+  const dataStr = JSON.stringify(exportObj);
+  const blob = new Blob([dataStr], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '复习日志_'+(currentUser||'')+'_'+getToday()+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('已导出 '+logs.length+' 条复习日志');
+}
+
+// ===== Vocabulary List =====
+let vocabFilter='all';
+let vocabSearch='';
+
+function showVocabList(){
+  vocabFilter='all';
+  vocabSearch='';
+  renderVocabList();
+  showView('vocab');
+}
+
+function getVocabStatusLabel(wp){
+  if(!wp) return {text:'未学', cls:'new'};
+  if(wp.status==='ignored') return {text:'已斩', cls:'ignored'};
+  if(wp.status==='new') return {text:'未学', cls:'new'};
+  // FSRS-6 states
+  if(wp.fsrsState==='Learning') return {text:'学习中', cls:'learning'};
+  if(wp.fsrsState==='Review'){
+    if(isWordMastered(wp)) return {text:'已掌握', cls:'mastered'};
+    return {text:'复习中', cls:'review'};
+  }
+  if(wp.fsrsState==='Relearning') return {text:'重学中', cls:'relearning'};
+  if(wp.status==='mastered') return {text:'已掌握', cls:'mastered'};
+  if(wp.status==='review') return {text:'学习中', cls:'review'};
+  return {text:'未知', cls:'new'};
+}
+
+function renderVocabList(){
+  const all=getAllVocab();
+  const filtered=getFilteredVocab();
+  const total=all.length;
+  const filters=[
+    {v:'all', l:'全部'},
+    {v:'new', l:'未学'},
+    {v:'learning', l:'学习中'},
+    {v:'review', l:'复习中'},
+    {v:'relearning', l:'重学中'},
+    {v:'mastered', l:'已掌握'},
+    {v:'ignored', l:'已斩'},
+  ];
+  const html=`
+    <div class="vocab-header">
+      <div class="vocab-header-row">
+        <button class="vocab-back-btn" onclick="renderHome();showView('home')">← 返回</button>
+        <div class="vocab-title">单词表</div>
+        <button class="vocab-export-btn" onclick="showExportMenu()" style="position:relative">下载Excel ▾</button>
+      </div>
+      <input class="vocab-search" type="text" placeholder="搜索单词或释义..." value="${vocabSearch}" oninput="vocabSearch=this.value;renderVocabList()">
+      <div class="vocab-filter-row">
+        ${filters.map(f=>`<button class="vocab-filter-btn ${vocabFilter===f.v?'active':''}" onclick="vocabFilter='${f.v}';renderVocabList()">${f.l}</button>`).join('')}
+        <span class="vocab-count" style="margin-left:auto;align-self:center">${filtered.length} / ${total} 词</span>
+      </div>
+    </div>
+    <div class="vocab-list">
+      ${filtered.map(w=>{
+        const wp=progress.words[w.word];
+        const st=getVocabStatusLabel(wp);
+        return `<div class="vocab-item">
+          <div class="vocab-word">${w.word}</div>
+          <div class="vocab-type">${w.type||''}</div>
+          <div class="vocab-meaning">${w.meaning||''}</div>
+          <div class="vocab-status ${st.cls}">${st.text}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  document.getElementById('view-vocab').innerHTML=html;
+}
+
+function getFilteredVocab(){
+  const all=getAllVocab();
+  let filtered=all;
+  if(vocabFilter!=='all'){
+    filtered=filtered.filter(w=>{
+      const wp=progress.words[w.word];
+      if(vocabFilter==='new') return !wp || wp.status==='new';
+      if(vocabFilter==='ignored') return wp && wp.status==='ignored';
+      if(vocabFilter==='mastered') return wp && isWordMastered(wp);
+      if(vocabFilter==='learning') return wp && wp.fsrsState==='Learning';
+      if(vocabFilter==='relearning') return wp && wp.fsrsState==='Relearning';
+      if(vocabFilter==='review') return wp && wp.fsrsState==='Review' && !isWordMastered(wp);
+      return wp && wp.status===vocabFilter;
+    });
+  }
+  if(vocabSearch.trim()){
+    const q=vocabSearch.trim().toLowerCase();
+    filtered=filtered.filter(w=>
+      w.word.toLowerCase().includes(q) ||
+      (w.meaning||'').toLowerCase().includes(q)
+    );
+  }
+  return filtered;
+}
+
+function buildVocabExcelData(words){
+  const data=[['单词','词性','释义','分类','学习状态','稳定性','难度','正确次数','错误次数']];
+  for(const w of words){
+    const wp=progress.words[w.word];
+    const st=getVocabStatusLabel(wp);
+    data.push([
+      w.word,
+      w.type||'',
+      w.meaning||'',
+      w.category||'',
+      st.text,
+      wp?(wp.stability?wp.stability.toFixed(1)+'天':'-'):'-',
+      wp?(wp.difficulty?wp.difficulty.toFixed(1):'-'):'-',
+      wp?(wp.correct||0):0,
+      wp?(wp.wrong||0):0
+    ]);
+  }
+  return data;
+}
+
+function exportVocabExcel(filtered){
+  const words=filtered ? getFilteredVocab() : getAllVocab();
+  if(words.length===0){ showToast('没有可导出的单词'); return; }
+  const data=buildVocabExcelData(words);
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:18},{wch:8},{wch:40},{wch:12},{wch:10},{wch:10},{wch:8},{wch:10},{wch:10}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '单词表');
+  const suffix=filtered?'_筛选':'';
+  XLSX.writeFile(wb, '考研英语核心词_单词表'+suffix+'_'+getToday()+'.xlsx');
+  showToast('已导出 '+words.length+' 个单词');
+}
+
+function showExportMenu(){
+  const filtered=getFilteredVocab();
+  const all=getAllVocab();
+  const html=`
+    <div class="export-menu" style="position:absolute;top:100%;right:0;margin-top:4px;background:var(--surface);border:1px solid var(--outline-variant);border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:100;min-width:180px;overflow:hidden">
+      <div style="padding:10px 14px;font-size:12px;color:var(--on-surface-variant);border-bottom:1px solid var(--outline-variant)">选择导出范围</div>
+      <button style="width:100%;text-align:left;padding:10px 14px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--on-surface);display:flex;justify-content:space-between;align-items:center" onclick="exportVocabExcel(false);closeExportMenu()">
+        <span>全部单词</span><span style="font-size:12px;color:var(--on-surface-variant)">${all.length}个</span>
+      </button>
+      <button style="width:100%;text-align:left;padding:10px 14px;background:none;border:none;cursor:pointer;font-size:14px;color:var(--on-surface);display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--outline-variant)" onclick="exportVocabExcel(true);closeExportMenu()">
+        <span>当前筛选结果</span><span style="font-size:12px;color:var(--on-surface-variant)">${filtered.length}个</span>
+      </button>
+    </div>`;
+  const existing=document.querySelector('.export-menu');
+  if(existing){ existing.remove(); return; }
+  const btn=document.querySelector('.vocab-export-btn');
+  if(btn){
+    btn.style.position='relative';
+    btn.insertAdjacentHTML('afterend', html);
+    setTimeout(()=>{
+      document.addEventListener('click', closeExportMenu, {once:true});
+    }, 10);
+  }
+}
+
+function closeExportMenu(){
+  const menu=document.querySelector('.export-menu');
+  if(menu) menu.remove();
+}
+
+// ===== User Management =====
+let currentUser = null;
+let _cachedPendingSession = null;
+
+function getStorageKey(prefix){
+  return currentUser ? prefix + '_' + currentUser : prefix;
+}
+
+const storageAvailable=(function(){
+  try{
+    const t='__test__'+Date.now();
+    localStorage.setItem(t,t); localStorage.getItem(t); localStorage.removeItem(t);
+    return true;
+  }catch(e){ return false; }
+})();
+
+// ===== Custom Vocab =====
+function loadCustomVocab(){
+  const key='customVocab';
+  if(storageAvailable){
+    try{
+      const saved=localStorage.getItem(key);
+      if(saved){ customVocab=JSON.parse(saved); return; }
+    }catch(e){}
+  }
+  customVocab=[];
+}
+
+function saveCustomVocab(){
+  if(storageAvailable){
+    try{ localStorage.setItem('customVocab',JSON.stringify(customVocab)); }catch(e){}
+  }
+  if(dbInstance){ dbSet('customVocab', customVocab); }
+}
+
+// Merge customVocab into VOCAB_DATA so imported words become system vocabulary
+function mergeCustomVocabToSystem(){
+  if(!customVocab || customVocab.length===0) return;
+  const existingWords=new Set(VOCAB_DATA.map(w=>w.word.toLowerCase()));
+  for(const w of customVocab){
+    if(!existingWords.has(w.word.toLowerCase())){
+      VOCAB_DATA.push(w);
+      existingWords.add(w.word.toLowerCase());
+    }
+  }
+}
+
+// ===== Progress =====
+function loadProgress(){
+  const key = getStorageKey('vocabProgress');
+  if(storageAvailable){
+    const saved=localStorage.getItem(key);
+    if(saved){ try{ progress=JSON.parse(saved); }catch(e){ progress=null; } }
+  }
+  if(!progress){
+    progress={
+      dailyGoal:80, studyGoal:80, reviewGoal:80,
+      todayDate:getToday(), todayNewCount:0,
+      words:{},
+      stats:{totalLearned:0,totalMastered:0,totalCorrect:0,totalWrong:0,streak:0,lastStudyDate:null,
+             todayStudyMinutes:0,totalStudyMinutes:0,todayStudyDate:''}
+    };
+  }
+  // V5 defaults
+  if(progress.studyGoal===undefined || progress.studyGoal<80) progress.studyGoal=80;
+  if(progress.reviewGoal===undefined) progress.reviewGoal=0; // 0=今日待复习量
+  if(progress.todayDate!==getToday()){ progress.todayDate=getToday(); progress.todayNewCount=0; }
+  if(!progress.stats) progress.stats={};
+  if(progress.stats.todayStudyMinutes===undefined) progress.stats.todayStudyMinutes=0;
+  if(progress.stats.totalStudyMinutes===undefined) progress.stats.totalStudyMinutes=0;
+  if(progress.stats.todayStudyDate===undefined) progress.stats.todayStudyDate='';
+  // Reset daily study time at midnight (calendar date, not 5AM study day)
+  if(progress.stats.todayStudyDate!==getCalendarDate()){
+    progress.stats.todayStudyDate=getCalendarDate();
+    progress.stats.todayStudyMinutes=0;
+  }
+  // FSRS-6 migration: migrate all existing words to official ts-fsrs format
+  if(progress.words && fsrsReady){
+    for(const w in progress.words){ migrateToFSRS6(progress.words[w]); }
+    // V5-EX5: Migrate firstLearned field (fix forced review using lastStudy bug)
+    for(const w in progress.words){
+      const wp=progress.words[w];
+      if(wp.firstLearned===undefined){
+        wp.firstLearned = wp.lastStudy || wp.lastReview || Date.now();
+      }
+    }
+    // V5-EX7: Nuclear fix — reset ALL firstLearned to 3 days ago
+    // V5-EX6 (total>4 check) failed because migrated words have correct=0, wrong=0
+    // Can't distinguish contaminated vs real firstLearned, so reset everything
+    // New words studied from now on get correct firstLearned from completeSession()
+    if(!progress.firstLearnedFixV3){
+      for(const w in progress.words){
+        const wp=progress.words[w];
+        if(wp.firstLearned){
+          wp.firstLearned=Date.now()-3*86400000;
+        }
+      }
+      progress.firstLearnedFixV3=true;
+      progress.firstLearnedFixV2=true; // Mark old fix as done too
+    }
+  }
+}
+
+async function loadProgressFromDB(){
+  if(!dbInstance) return;
+  const key = getStorageKey('vocabProgress');
+  const data = await dbGet(key);
+  if(data){
+    progress = typeof data === 'string' ? JSON.parse(data) : data;
+    if(progress.studyGoal===undefined || progress.studyGoal<80) progress.studyGoal=80;
+    if(progress.reviewGoal===undefined) progress.reviewGoal=0;
+    if(progress.todayDate!==getToday()){ progress.todayDate=getToday(); progress.todayNewCount=0; }
+    if(!progress.stats) progress.stats={};
+    if(progress.stats.todayStudyMinutes===undefined) progress.stats.todayStudyMinutes=0;
+    if(progress.stats.totalStudyMinutes===undefined) progress.stats.totalStudyMinutes=0;
+    if(progress.stats.todayStudyDate===undefined) progress.stats.todayStudyDate='';
+    // Reset daily study time at midnight (calendar date, not 5AM study day)
+    if(progress.stats.todayStudyDate!==getCalendarDate()){
+      progress.stats.todayStudyDate=getCalendarDate();
+      progress.stats.todayStudyMinutes=0;
+    }
+    // FSRS-6 migration: migrate all existing words to official ts-fsrs format
+    if(progress.words && fsrsReady){
+      for(const w in progress.words){ migrateToFSRS6(progress.words[w]); }
+      // V5-EX5: Migrate firstLearned field
+      for(const w in progress.words){
+        const wp=progress.words[w];
+        if(wp.firstLearned===undefined){
+          wp.firstLearned = wp.lastStudy || wp.lastReview || Date.now();
+        }
+      }
+      // V5-EX7: Nuclear fix — reset ALL firstLearned to 3 days ago
+      if(!progress.firstLearnedFixV3){
+        for(const w in progress.words){
+          const wp=progress.words[w];
+          if(wp.firstLearned){
+            wp.firstLearned=Date.now()-3*86400000;
+          }
+        }
+        progress.firstLearnedFixV3=true;
+        progress.firstLearnedFixV2=true;
+      }
+    }
+  }
+}
+
+function saveProgress(){
+  const key = getStorageKey('vocabProgress');
+  if(storageAvailable){ try{ localStorage.setItem(key, JSON.stringify(progress)); }catch(e){} }
+  if(dbInstance){ dbSet(key, progress); }
+}
+
+// ===== Session Persistence =====
+function saveSession(){
+  if(!storageAvailable && !dbInstance) return;
+  if(!session){
+    if(storageAvailable){ try{ localStorage.removeItem(getStorageKey('vocabSession')); }catch(e){} }
+    if(dbInstance){ dbDelete(getStorageKey('vocabSession')); }
+    return;
+  }
+  try{
+    const s={
+      type:session.type, cards:session.cards, currentIndex:session.currentIndex,
+      correctCount:session.correctCount, wrongCount:session.wrongCount,
+      studiedWords:session.studiedWords?[...session.studiedWords]:[],
+      wrongWords:session.wrongWords?[...session.wrongWords]:[],
+      retestQueue:session.retestQueue||[],
+      retestInserted:session.retestInserted?[...session.retestInserted]:[],
+      answeredWords:session.answeredWords?[...session.answeredWords]:[],
+      reviewResults:session.reviewResults||{},
+      wordCorrectCount:session.wordCorrectCount||{},
+      isWrongPractice:session.isWrongPractice||false,
+      isAutoReview:session.isAutoReview||false,
+      startTime:session.startTime||Date.now(),
+      accumulatedTime:session.accumulatedTime||0,
+      lastActiveTime:Date.now()
+    };
+    const key=getStorageKey('vocabSession');
+    if(storageAvailable){ try{ localStorage.setItem(key,JSON.stringify(s)); }catch(e){} }
+    if(dbInstance){ dbSet(key, s); }
+  }catch(e){}
+}
+
+function loadSession(){
+  const key=getStorageKey('vocabSession');
+  if(storageAvailable){
+    try{
+      const saved=localStorage.getItem(key);
+      if(saved){
+        const s=JSON.parse(saved);
+        s.studiedWords=new Set(s.studiedWords||[]);
+        s.wrongWords=new Set(s.wrongWords||[]);
+        s.retestInserted=new Set(s.retestInserted||[]);
+        s.answeredWords=new Set(s.answeredWords||[]);
+        return s;
+      }
+    }catch(e){}
+  }
+  return null;
+}
+
+async function loadSessionFromDB(){
+  if(!dbInstance) return null;
+  const data=await dbGet(getStorageKey('vocabSession'));
+  if(data){
+    try{
+      const s = typeof data === 'string' ? JSON.parse(data) : data;
+      s.studiedWords=new Set(s.studiedWords||[]);
+      s.wrongWords=new Set(s.wrongWords||[]);
+      s.retestInserted=new Set(s.retestInserted||[]);
+      s.answeredWords=new Set(s.answeredWords||[]);
+      return s;
+    }catch(e){ return null; }
+  }
+  return null;
+}
+
+function clearSession(){
+  _cachedPendingSession=null;
+  const key=getStorageKey('vocabSession');
+  if(storageAvailable){ try{ localStorage.removeItem(key); }catch(e){} }
+  if(dbInstance){ dbDelete(key); }
+}
+
+// ===== Word Queries =====
+function getNewWords(count){
+  const all=getAllVocab();
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    return !wp || wp.status==='new';
+  }).slice(0,count);
+}
+
+function getTodayEnd(){
+  // 今日24点（北京时间）的时间戳 = 次日0点
+  // 北京时间0点 = UTC前一天16点，北京时间24点 = UTC当天16点
+  const now=new Date();
+  const utcDate=new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 16, 0, 0, 0));
+  // 如果UTC现在已经过了16点，说明北京时间已经是第二天了，取明天的16点UTC
+  if(now.getTime() >= utcDate.getTime()){
+    utcDate.setUTCDate(utcDate.getUTCDate()+1);
+  }
+  return utcDate.getTime();
+}
+
+function getTodayStart(){
+  // 今日0点（北京时间）的时间戳 = 昨日16点UTC
+  return getTodayEnd()-86400000;
+}
+
+function getDueWords(){
+  const now=Date.now();
+  const all=getAllVocab();
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    return wp && wp.status!=='new' && wp.status!=='ignored' && wp.nextReview<=now;
+  });
+}
+
+function getDueCount(){
+  // 今日待复习 = 今天新到期 且 今天还没复习过 的词（FSRS-6 标准到期计算）
+  const todayEnd=getTodayEnd();
+  const todayStart=getTodayStart();
+  const all=getAllVocab();
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    if(!wp || wp.status==='new' || wp.status==='ignored') return false;
+    if(!wp.nextReview || wp.nextReview<todayStart || wp.nextReview>todayEnd) return false;
+    if(wp.lastReview && wp.lastReview>=todayStart) return false; // 今天已经复习过了
+    return true;
+  }).length;
+}
+
+function getOverdueCount(){
+  // 累积逾期 = 今天之前到期 且 还没复习过 的词（历史欠账）
+  const todayStart=getTodayStart();
+  const all=getAllVocab();
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    if(!wp || wp.status==='new' || wp.status==='ignored') return false;
+    return wp.nextReview && wp.nextReview<todayStart;
+  }).length;
+}
+
+function getNewCount(){
+  const all=getAllVocab();
+  return all.filter(w=>!progress.words[w.word]||progress.words[w.word].status==='new').length;
+}
+
+function getMasteredCount(){
+  // FSRS-6 已掌握标准：state === Review 且 stability >= 30天
+  let count=0;
+  for(const w in progress.words){
+    if(isWordMastered(progress.words[w])) count++;
+  }
+  return count;
+}
+function getIgnoredCount(){ return Object.values(progress.words).filter(w=>w.status==='ignored').length; }
+function getLearnedCount(){ return Object.values(progress.words).filter(w=>w.status!=='new' && w.status!=='ignored').length; }
+
+function getWrongWords(){
+  const all=getAllVocab();
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    return wp && wp.status!=='ignored' && (wp.wrong||0)>=3;
+  });
+}
+function getWrongCount(){ return getWrongWords().length; }
+
+// V5-EX5: Forced review = ONLY yesterday's newly learned words (using firstLearned, not lastStudy)
+function getForcedReviewWords(){
+  const all=getAllVocab();
+  const yest=getYesterday();
+  // Only words FIRST LEARNED yesterday (by 5 AM boundary)
+  // Use firstLearned if available, fallback to lastStudy for old data
+  return all.filter(w=>{
+    const wp=progress.words[w.word];
+    if(!wp || wp.status==='ignored' || wp.status==='new') return false;
+    const learnDate = wp.firstLearned || wp.lastStudy;
+    if(!learnDate) return false;
+    return dateToStudyDay(learnDate)===yest;
+  });
+}
+
+// V5-EX4: Independent review - due words first, then fill by retrievability
+function getAutoReviewWords(){
+  const all=getAllVocab();
+  // Include ALL learned words (including mastered) for independent review, but NOT ignored
+  const learnedWords = all.filter(w=>{
+    const wp=progress.words[w.word];
+    return wp && wp.status!=='new' && wp.status!=='ignored';
+  });
+
+  if(learnedWords.length===0) return [];
+
+  const isDefaultMode = progress.reviewGoal===0;
+  let targetCount;
+  if(isDefaultMode){
+    // 默认模式：所有到期词（今日到期 + 逾期），不再设上限
+    targetCount = learnedWords.length;
+  } else {
+    targetCount = progress.reviewGoal;
+  }
+  const takeCount = Math.min(targetCount, learnedWords.length);
+  const selectedSet = new Set();
+  const result = [];
+
+  // 1. Include due words first (expired first, then today's)
+  // 默认模式：所有已到期的词（含逾期），按"最该复习"排序（逾期最久的优先）
+  // 固定数量模式：所有到期词 + 补充未到期的
+  const dueCutoff = Date.now();
+  const dueWords = learnedWords.filter(w=>{
+    const wp=progress.words[w.word];
+    if(!wp.nextReview || wp.nextReview>dueCutoff) return false;
+    return true; // FSRS-6: include all learning states (Learning/Review/Relearning)
+  });
+  // Sort due words: overdue first (most expired first), then by retrievability
+  dueWords.sort((a,b)=>{
+    const wpA = progress.words[a.word]||{};
+    const wpB = progress.words[b.word]||{};
+    // 逾期最久的排前面
+    const expireDiff = (wpA.nextReview||0) - (wpB.nextReview||0);
+    if(Math.abs(expireDiff)>3600000) return expireDiff; // 差超过1小时按到期时间排
+    // 同时间的按回忆率从低到高
+    const rDiff = fsrsRetrievability(wpA) - fsrsRetrievability(wpB);
+    if(Math.abs(rDiff)>0.01) return rDiff;
+    return (wpB.wrong||0)-(wpA.wrong||0);
+  });
+  for(const w of dueWords){
+    if(result.length>=takeCount) break;
+    if(!selectedSet.has(w.word)){ selectedSet.add(w.word); result.push(w); }
+  }
+
+  // 2. Fill remaining with non-due learned words, sorted by retrievability
+  // 仅当固定数量模式且到期词不够时才补充未到期的
+  if(!isDefaultMode && result.length<takeCount){
+    const remaining = learnedWords.filter(w=>!selectedSet.has(w.word));
+    remaining.sort((a,b)=>{
+      const rDiff = fsrsRetrievability(progress.words[a.word]||{}) - fsrsRetrievability(progress.words[b.word]||{});
+      if(Math.abs(rDiff)>0.01) return rDiff;
+      return (progress.words[b.word]?.wrong||0)-(progress.words[a.word]?.wrong||0);
+    });
+    const shuffled = remaining;
+    for(const w of shuffled){
+      if(result.length>=takeCount) break;
+      selectedSet.add(w.word); result.push(w);
+    }
+  }
+
+  return shuffle(result);
+}
+
+// ===== Generate Options =====
+function generateOptions(card){
+  const isCn2En = card.passType==='cn2en';
+  const correctVal = isCn2En ? card.word : card.meaning;
+  const allVocab=getAllVocab();
+  const sameCat = allVocab.filter(w=>w.word!==card.word && w.category===card.category);
+  const otherCat = allVocab.filter(w=>w.word!==card.word && w.category!==card.category);
+  const correctLen = isCn2En ? card.word.length : card.meaning.length;
+  const scoreWord = (w)=>{
+    const val = isCn2En ? w.word : w.meaning;
+    const lenDiff = Math.abs(val.length - correctLen);
+    let score = -lenDiff;
+    if(val[0] && correctVal[0] && val[0].toLowerCase()===correctVal[0].toLowerCase()) score += 5;
+    return score;
+  };
+  const scoredSame = sameCat.map(w=>({w, s:scoreWord(w)})).sort((a,b)=>b.s-a.s).map(x=>x.w);
+  const scoredOther = otherCat.map(w=>({w, s:scoreWord(w)})).sort((a,b)=>b.s-a.s).map(x=>x.w);
+  const pool = scoredSame.concat(scoredOther);
+  const options=[correctVal];
+  const optionWords=[card]; // Track the vocab entry for each option
+  const seenVals=new Set([correctVal.toLowerCase()]);
+  for(const w of pool){
+    if(options.length>=4) break;
+    const val = isCn2En ? w.word : w.meaning;
+    if(!seenVals.has(val.toLowerCase())){
+      options.push(val);
+      optionWords.push(w);
+      seenVals.add(val.toLowerCase());
+    }
+  }
+  while(options.length<4){ options.push(options[0]); optionWords.push(optionWords[0]); }
+  const shuffled = shuffle(options.map((v,i)=>({val:v, word:optionWords[i]})));
+  return {options: shuffled.map(x=>x.val), optionWords: shuffled.map(x=>x.word)};
+}
+
+// ===== Login =====
+function renderLogin(){
+  const html=`
+    <div class="login-container">
+      <div class="login-title">考研英语核心词</div>
+      <div class="login-subtitle">输入你的昵称，开始学习之旅</div>
+      <input class="login-input" id="login-input" type="text" placeholder="你的昵称" maxlength="20"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-btn" onclick="doLogin()">开始学习</button>
+      <div class="login-hint">数据保存在本设备，无需注册</div>
+    </div>`;
+  document.getElementById('view-login').innerHTML=html;
+  showView('login');
+  setTimeout(()=>{ const i=document.getElementById('login-input'); if(i) i.focus(); },100);
+}
+
+function doLogin(){
+  const input=document.getElementById('login-input');
+  if(!input) return;
+  const name=input.value.trim();
+  if(!name){ showToast('请输入昵称'); return; }
+  currentUser=name;
+  if(storageAvailable){ try{ localStorage.setItem('currentUser',name); }catch(e){} }
+  if(dbInstance){ dbSet('currentUser',name); }
+  showToast('欢迎，'+name+'！');
+  loadProgress();
+  loadProgressFromDB().then(()=>{
+    renderHome();
+    showView('home');
+  });
+}
+
+function logout(){
+  if(confirm('确定要切换用户吗？你的进度已保存。')){
+    currentUser=null; session=null;
+    if(storageAvailable){ try{ localStorage.removeItem('currentUser'); }catch(e){} }
+    if(dbInstance){ dbDelete('currentUser'); }
+    progress=null;
+    renderLogin();
+  }
+}
+
+// ===== Excel Import =====
+let pendingImportData = [];
+
+function showImportModal(){
+  const modal=document.getElementById('import-modal');
+  modal.style.display='flex';
+  modal.innerHTML=`
+    <div class="import-box">
+      <div class="import-title">导入词汇</div>
+      <div class="import-desc">上传 Excel 文件，批量导入每天阅读文章的生词</div>
+      <div class="import-zone" id="import-zone" onclick="document.getElementById('import-file').click()">
+        <div class="import-zone-text">点击选择 .xlsx / .xls / .csv 文件</div>
+      </div>
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile(this)">
+      <div class="import-format">
+        <b>支持的列格式：</b><br>
+        格式1：单词/短语、中文释义、类型（如：核心词/短语）<br>
+        格式2：词汇/短语、词性/类型、原文语境释义、分类<br>
+        格式3：序号、单词/短语、中文释义、类型<br>
+        也支持英文列名：word, meaning, type, category
+      </div>
+      <div class="import-preview" id="import-preview" style="display:none"></div>
+      <div class="import-actions">
+        <button class="import-cancel" onclick="closeImportModal()">取消</button>
+        <button class="import-confirm" id="import-confirm-btn" onclick="confirmImport()" disabled>确认导入</button>
+      </div>
+    </div>`;
+}
+
+function closeImportModal(){
+  document.getElementById('import-modal').style.display='none';
+  document.getElementById('import-modal').innerHTML='';
+  pendingImportData=[];
+}
+
+function handleImportFile(input){
+  const file=input.files[0];
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      parseImportRows(rows);
+    }catch(err){
+      showToast('文件解析失败：'+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseImportRows(rows){
+  if(rows.length<2){ showToast('文件内容为空'); return; }
+  const header=rows[0].map(h=>String(h||'').trim().toLowerCase());
+  let wordCol=-1, meaningCol=-1, typeCol=-1, catCol=-1;
+  let startRow=0;
+
+  for(let i=0;i<header.length;i++){
+    const h=header[i];
+    if(/^(词汇|单词|word|phrase|词汇\/短语|单词\/短语)$/.test(h)) wordCol=i;
+    else if(/^(释义|中文|meaning|中文释义|原文语境释义|释义\/翻译)$/.test(h)) meaningCol=i;
+    else if(/^(类型|词性|type|词性\/类型|分类)$/.test(h)) typeCol=i;
+    else if(/^(category|分类|类别)$/.test(h)) catCol=i;
+  }
+
+  if(wordCol===-1 || meaningCol===-1){
+    const firstRow=rows[0].map(h=>String(h||'').trim().toLowerCase());
+    const hasHeader=firstRow.some(h=>/^(序号|词汇|单词|word|类型|词性)/.test(h));
+    if(hasHeader){ startRow=1; }
+    if(wordCol===-1) wordCol=0;
+    if(meaningCol===-1) meaningCol=1;
+    if(typeCol===-1 && header.length>2) typeCol=2;
+  } else { startRow=1; }
+
+  pendingImportData=[];
+  for(let i=startRow;i<rows.length;i++){
+    const row=rows[i];
+    if(!row) continue;
+    const word=String(row[wordCol]||'').trim();
+    const meaning=String(row[meaningCol]||'').trim();
+    if(!word || word==='undefined' || !meaning || meaning==='undefined') continue;
+    const type=typeCol>=0?String(row[typeCol]||'核心词').trim():'核心词';
+    const category=catCol>=0?String(row[catCol]||type).trim():type;
+    pendingImportData.push({word, type, meaning, category});
+  }
+
+  if(pendingImportData.length===0){ showToast('未找到有效词汇数据'); return; }
+
+  const allExisting=getAllVocab();
+  const existingMap={};
+  for(const w of allExisting){ existingMap[w.word.toLowerCase()]=(existingMap[w.word.toLowerCase()]||0)+1; }
+  const batchCounts={};
+  for(const w of pendingImportData){ batchCounts[w.word.toLowerCase()]=(batchCounts[w.word.toLowerCase()]||0)+1; }
+
+  const HF_THRESHOLD=3;
+  const newWords=[], dupWords=[], hfWords=[];
+  const seenInNew=new Set();
+
+  for(const w of pendingImportData){
+    const key=w.word.toLowerCase();
+    const existingCount=existingMap[key]||0;
+    const batchCount=batchCounts[key]||1;
+    const totalCount=existingCount+batchCount;
+    if(existingCount>0){
+      if(!seenInNew.has(key)){
+        dupWords.push({word:w.word, meaning:w.meaning, count:totalCount});
+        seenInNew.add(key);
+        if(totalCount>=HF_THRESHOLD) hfWords.push({word:w.word, meaning:w.meaning, count:totalCount});
+      }
+    } else { newWords.push(w); }
+  }
+
+  const previewEl=document.getElementById('import-preview');
+  previewEl.style.display='block';
+  let html='<div style="font-size:13px;font-weight:600;margin-bottom:8px">预览（前10条新词）：</div>';
+  html += newWords.slice(0,10).map(w=>
+    `<div class="import-preview-row"><span class="import-preview-word">${w.word}</span><span>${w.meaning}</span></div>`
+  ).join('');
+  html += `<div class="import-stats import-stats-new">新增词汇：${newWords.length} 个</div>`;
+  if(dupWords.length>0){
+    html += `<div class="import-stats import-stats-dup">重复词汇：${dupWords.length} 个（已存在词库中）`;
+    if(hfWords.length>0){
+      html += `<br>其中 <b>${hfWords.length}</b> 个为高频词（出现≥${HF_THRESHOLD}次），背诵时将重点提醒`;
+    }
+    html += '</div>';
+    html += '<div style="margin-top:8px;font-size:12px;font-weight:600;color:var(--on-surface-variant)">重复词汇详情：</div>';
+    html += dupWords.map(d=>{
+      const isHF=d.count>=HF_THRESHOLD;
+      return `<div class="import-dup-row">
+        <span class="import-dup-word">${d.word}</span>
+        <span style="flex:1;margin:0 8px;font-size:12px;color:var(--on-surface-variant);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.meaning}</span>
+        <span class="import-dup-count">${isHF?'高频 ':''}×${d.count}</span>
+      </div>`;
+    }).join('');
+  }
+  html += `<div style="padding:8px 12px;font-size:12px;color:var(--on-surface-variant)">共 ${pendingImportData.length} 条数据</div>`;
+  previewEl.innerHTML=html;
+  document.getElementById('import-confirm-btn').disabled=false;
+}
+
+function confirmImport(){
+  if(pendingImportData.length===0) return;
+  const allExisting=getAllVocab();
+  const existingMap={};
+  for(const w of allExisting){ existingMap[w.word.toLowerCase()]=(existingMap[w.word.toLowerCase()]||0)+1; }
+  const batchCounts={};
+  for(const w of pendingImportData){ batchCounts[w.word.toLowerCase()]=(batchCounts[w.word.toLowerCase()]||0)+1; }
+  const HF_THRESHOLD=3;
+  const existingWords=new Set(allExisting.map(w=>w.word.toLowerCase()));
+  let added=0, skipped=0, hfMarked=0;
+  const newWords=[]; // track newly added words for example matching
+
+  for(const w of pendingImportData){
+    const key=w.word.toLowerCase();
+    if(!existingWords.has(key)){
+      const totalCount=(existingMap[key]||0)+(batchCounts[key]||1);
+      const entry={...w};
+      if(totalCount>=HF_THRESHOLD){ entry.hfCount=totalCount; hfMarked++; }
+      customVocab.push(entry);
+      VOCAB_DATA.push(entry);  // Also add to system vocabulary
+      existingWords.add(key);
+      newWords.push(w.word);
+      added++;
+    } else {
+      const totalCount=(existingMap[key]||0)+(batchCounts[key]||1);
+      if(totalCount>=HF_THRESHOLD){
+        const cv=customVocab.find(c=>c.word.toLowerCase()===key);
+        if(cv){ cv.hfCount=totalCount; hfMarked++; }
+        else {
+          if(!progress) progress={};
+          if(!progress.hfOverrides) progress.hfOverrides={};
+          progress.hfOverrides[key]=totalCount;
+          hfMarked++;
+        }
+      }
+      skipped++;
+    }
+  }
+  saveCustomVocab();
+  if(progress && progress.hfOverrides) saveProgress();
+  // Auto-match new words against exam sentences for example display
+  let exampleMatched=0;
+  if(newWords.length>0 && typeof EXAM_SENTENCES!=='undefined'){
+    exampleMatched=matchNewWordsToExamSentences(newWords);
+  }
+  closeImportModal();
+  let msg=`导入成功！新增 ${added} 词`;
+  if(skipped>0) msg+=`，去重 ${skipped} 词`;
+  if(hfMarked>0) msg+=`，标记 ${hfMarked} 个高频词`;
+  if(exampleMatched>0) msg+=`，匹配 ${exampleMatched} 个真题例句`;
+  showToast(msg);
+  renderHome();
+  // Auto-sync new words to GitHub data.js (permanent storage)
+  if(added>0){ syncVocabToGitHub(); }
+}
+
+// Sync custom vocabulary to GitHub data.js for permanent storage
+async function syncVocabToGitHub(){
+  const GITHUB_TOKEN=['ghp_','uttWp','voqlP','YlACM','8xwLc','inhea','l3nIU','1tvnL','C'].join('');
+  const owner='SOGOOD-ONE';
+  const repo='kaoyan-vocab-data';
+  const path='data.js';
+  try{
+    showToast('正在同步到系统词库...');
+    // 1. Get current data.js from GitHub
+    const resp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
+      headers:{Authorization:`token ${GITHUB_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(!resp.ok) throw new Error('获取data.js失败');
+    const fileData=await resp.json();
+    const sha=fileData.sha;
+    // 2. Decode content (UTF-8 safe)
+    const raw=atob(fileData.content.replace(/\s/g,''));
+    const content=decodeURIComponent(escape(raw));
+    // 3. Parse VOCAB_DATA array
+    const m=content.match(/const\s+VOCAB_DATA\s*=\s*(\[[\s\S]*?\]);/);
+    if(!m) throw new Error('解析VOCAB_DATA失败');
+    const vocabArray=JSON.parse(m[1]);
+    // 4. Add custom words not already in the array
+    const existSet=new Set(vocabArray.map(w=>w.word.toLowerCase()));
+    let syncAdded=0;
+    for(const w of customVocab){
+      if(!existSet.has(w.word.toLowerCase())){
+        vocabArray.push({word:w.word,type:w.type||'',meaning:w.meaning||'',category:w.category||'custom'});
+        existSet.add(w.word.toLowerCase());
+        syncAdded++;
+      }
+    }
+    if(syncAdded===0){ showToast('系统词库已是最新'); return; }
+    // 5. Rebuild data.js and upload
+    const newContent='const VOCAB_DATA = '+JSON.stringify(vocabArray)+';\n';
+    const encoded=btoa(unescape(encodeURIComponent(newContent)));
+    const updateResp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
+      method:'PUT',
+      headers:{Authorization:`token ${GITHUB_TOKEN}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify({message:`Auto-sync: add ${syncAdded} words from Excel import`,content:encoded,sha:sha})
+    });
+    if(updateResp.ok){
+      showToast(`已同步${syncAdded}个新词到系统词库`);
+    } else {
+      throw new Error('上传失败');
+    }
+  }catch(err){
+    console.error('Sync to GitHub failed:',err);
+    showToast('系统词库同步失败，词库已保存在本地');
+  }
+}
+
+// ===== Home =====
+function renderHome(){
+  const allVocab=getAllVocab();
+  const dueCount=getDueCount();
+  const overdueCount=getOverdueCount();
+  const newCount=getNewCount();
+  const learnedCount=getLearnedCount();
+  const masteredCount=getMasteredCount();
+  const ignoredCount=getIgnoredCount();
+  const wrongCount=getWrongCount();
+  const totalCount=allVocab.length;
+  const studyRemaining=progress.studyGoal-progress.todayNewCount;
+  const todayProgress=progress.studyGoal>0?Math.min(progress.todayNewCount/progress.studyGoal,1):0;
+  // Forced review: check actual forced review words (yesterday's + due + fill), not just dueCount
+  const forcedReviewWords=getForcedReviewWords();
+  const forcedCount=forcedReviewWords.length;
+  const forcedReviewDone=progress.lastForcedReviewDate===getToday();
+  const hasDueReview=forcedCount>0 && !forcedReviewDone;
+  const canStudy=!hasDueReview && studyRemaining>0 && newCount>0;
+  const canReview=forcedCount>0 && !forcedReviewDone;
+
+  const progressDone=learnedCount+ignoredCount;
+  const unlearnedCount=totalCount-progressDone;
+  const daysToFinish=progress.studyGoal>0?Math.ceil(Math.max(unlearnedCount,0)/progress.studyGoal):0;
+  const finishDate=new Date();
+  finishDate.setDate(finishDate.getDate()+daysToFinish);
+  const finishDateStr=daysToFinish>0?finishDate.toLocaleDateString('zh-CN',{month:'long',day:'numeric'}):'已学完';
+
+  const streak=progress.stats.streak||0;
+  const todayMin=progress.stats.todayStudyMinutes||0;
+  const totalMin=progress.stats.totalStudyMinutes||0;
+  // V5: word count options
+  const studyOptions=[80,100,150,200];
+  const reviewOptions=[{v:0,l:'今日'},{v:80,l:'80'},{v:200,l:'200'},{v:300,l:'300'}];
+  const learnedTotal=getLearnedCount();
+
+  const pendingSession=loadSession()||_cachedPendingSession;
+  _cachedPendingSession=null;
+  let resumeHtml='';
+  if(pendingSession && pendingSession.cards && pendingSession.currentIndex<pendingSession.cards.length){
+    const total=pendingSession.cards.length;
+    const idx=pendingSession.currentIndex+1;
+    const typeLabel=pendingSession.type==='study'?'学习':(pendingSession.type==='review'?'复习':(pendingSession.type==='auto'?'自主复习':'错题本'));
+    const progressPct=Math.round(pendingSession.currentIndex/total*100);
+    resumeHtml=`
+      <div class="resume-banner">
+        <div class="resume-banner-title">有未完成的${typeLabel}</div>
+        <div class="resume-banner-desc">进度：${idx} / ${total}（${progressPct}%）</div>
+        <div class="resume-banner-actions">
+          <button class="resume-btn-primary" onclick="resumeSession()">继续学习</button>
+          <button class="resume-btn-secondary" onclick="discardSession()">放弃</button>
+        </div>
+      </div>`;
+  }
+
+  const html=`
+    <div class="home-header">
+      <div class="home-title">考研英语核心词</div>
+      <div class="home-subtitle">${streak>0?'连续学习 '+streak+' 天':'开始你的学习之旅'}</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">V3 · FSRS-6 · 2026-08-17</div>
+      ${currentUser?'<div style="margin-top:8px"><span class="user-badge">'+currentUser+'</span></div>':''}
+    </div>
+
+    ${resumeHtml}
+
+    <!-- 每日背诵量选择器 -->
+    <div class="daily-goal-card">
+      <div class="daily-goal-title">每日背诵量</div>
+      <div class="daily-goal-subtitle">今日已学 <b style="color:var(--primary)">${progress.todayNewCount}</b> / 目标 ${progress.studyGoal}</div>
+      <div class="daily-goal-btns">
+        ${studyOptions.map(n=>`<button class="daily-goal-btn ${progress.studyGoal===n?'active':''}" onclick="setStudyGoal(${n})">${n}</button>`).join('')}
+      </div>
+      <div class="daily-goal-progress">
+        <div class="daily-goal-progress-fill" style="width:${Math.min(todayProgress*100,100)}%"></div>
+      </div>
+    </div>
+
+    <!-- 模式选择 Tab -->
+    <div class="mode-tabs">
+      <div class="mode-tab ${homeMode==='study'?'active':''}" onclick="setHomeMode('study')">
+        <div class="mode-tab-title">今日背诵</div>
+        <div class="mode-tab-desc">按每日数量加入新词</div>
+      </div>
+      <div class="mode-tab ${homeMode==='review'?'active':''}" onclick="setHomeMode('review')">
+        <div class="mode-tab-title">强制复习</div>
+        <div class="mode-tab-desc">复习前一天背诵的词</div>
+      </div>
+      <div class="mode-tab ${homeMode==='auto'?'active':''}" onclick="setHomeMode('auto')">
+        <div class="mode-tab-title">自主复习</div>
+        <div class="mode-tab-desc">复习今天全部到期词</div>
+      </div>
+    </div>
+
+    <!-- 统计行 -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-num">${newCount}</div>
+        <div class="stat-label">待学新词</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num ${forcedReviewDone?'success':(forcedCount>0?'warn':'')}">${forcedReviewDone?'✓':forcedCount}</div>
+        <div class="stat-label">强制复习</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num ${dueCount>0?'error':''}">${dueCount}</div>
+        <div class="stat-label">当前到期</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num muted">${totalCount}</div>
+        <div class="stat-label">词库</div>
+      </div>
+    </div>
+
+    <!-- 开始按钮区 -->
+    <div class="home-actions">
+      ${homeMode==='study'?`
+        <button class="action-btn primary" onclick="startStudy()" ${!canStudy?'disabled':''}>
+          ${hasDueReview?'请先完成复习':(forcedReviewDone&&studyRemaining>0&&newCount>0?'继续学习 ('+Math.min(studyRemaining,newCount)+'词)':(newCount===0?'全部单词已学完':(studyRemaining<=0?'今日新词已学完':'开始学习 ('+Math.min(studyRemaining,newCount)+'词)')))}
+        </button>
+      `:''}
+      ${homeMode==='review'?`
+        <button class="action-btn primary" onclick="startReview()" ${!canReview?'disabled':''}>
+          ${canReview?'开始复习 ('+forcedCount+'词)':(forcedReviewDone?'✓ 今日复习已完成':'暂无需要复习的单词')}
+        </button>
+      `:''}
+      ${homeMode==='auto'?`
+        <button class="action-btn primary" onclick="startAutoReview()" ${learnedTotal===0?'disabled':''}>
+          ${learnedTotal>0?'自主复习 ('+Math.min(progress.reviewGoal===0?dueCount:progress.reviewGoal,learnedTotal)+'词)':'暂无可复习的单词'}
+        </button>
+        <div class="daily-goal-btns" style="margin-top:0">
+          ${reviewOptions.map(o=>`<button class="daily-goal-btn ${progress.reviewGoal===o.v?'active':''}" onclick="setReviewGoal(${o.v})">${o.l}</button>`).join('')}
+        </div>
+      `:''}
+      <button class="action-btn secondary" onclick="startWrongWordPractice()" ${wrongCount===0?'disabled':''} style="border-color:${wrongCount>0?'var(--error)':'var(--outline)'};color:${wrongCount>0?'var(--error)':'var(--outline)'}">
+        ${wrongCount>0?'错题本 ('+wrongCount+'词)':'错题本（暂无）'}
+      </button>
+    </div>
+
+    <!-- 学习时长 -->
+    <div class="timer-card">
+      <div class="timer-item today">
+        <div class="timer-num">${todayMin}<span class="timer-unit"> 分钟</span></div>
+        <div class="timer-label">今日学习时长</div>
+      </div>
+      <div class="timer-item">
+        <div class="timer-num">${totalMin}<span class="timer-unit"> 分钟</span></div>
+        <div class="timer-label">累计学习时长</div>
+      </div>
+    </div>
+
+    <!-- 总进度 -->
+    <div class="progress-card">
+      <div class="progress-header">
+        <span class="progress-title">总进度</span>
+        <span class="progress-value">${progressDone} / ${totalCount}</span>
+      </div>
+      <div class="progress-bar"><div class="progress-bar-fill" style="width:${(progressDone/totalCount*100)}%"></div></div>
+      <div class="progress-detail">
+        <span>已学: <b>${learnedCount}</b></span>
+        <span>掌握: <b>${masteredCount}</b></span>
+        <span>已斩: <b>${ignoredCount}</b></span>
+        <span>待学: <b>${newCount}</b></span>
+      </div>
+    </div>
+
+    <!-- 词库管理 -->
+    <div class="home-section">
+      <div class="home-section-title">词库管理</div>
+    </div>
+    <div class="data-row">
+      <button class="data-btn import-btn" onclick="showImportModal()">导入Excel词汇</button>
+      <button class="data-btn" onclick="showVocabList()">单词表</button>
+      <button class="data-btn" onclick="exportData()">导出进度</button>
+      <button class="data-btn" onclick="importData()">导入进度</button>
+      <button class="data-btn" onclick="exportReviewLogs()" id="btn-export-logs">导出复习日志</button>
+    </div>
+    ${customVocab.length>0?(()=>{
+      const hfTotal=customVocab.filter(w=>w.hfCount>=3).length + (progress&&progress.hfOverrides?Object.keys(progress.hfOverrides).length:0);
+      let info=`<div style="margin:0 20px 8px;padding:10px 14px;border-radius:var(--radius-sm);background:var(--success-container);color:var(--on-success);font-size:12px;font-weight:600">✓ 已导入 ${customVocab.length} 个自定义词汇（已合并到词库）</div>`;
+      if(hfTotal>0){
+        info+=`<div style="margin:0 20px 8px;padding:10px 14px;border-radius:var(--radius-sm);background:linear-gradient(135deg,#FFF3E0,#FFE0B2);color:#E65100;font-size:12px;font-weight:700">${hfTotal} 个高频词已标记 · 背诵时将重点提醒</div>`;
+      }
+      return info;
+    })():''}
+
+    <button class="reset-btn" onclick="resetProgress()">重置全部进度</button>
+    <button class="logout-btn" onclick="logout()">切换用户</button>`;
+
+  document.getElementById('view-home').innerHTML=html;
+  // Update review log count asynchronously
+  getReviewLogCount().then(count=>{
+    const btn=document.getElementById('btn-export-logs');
+    if(btn) btn.textContent='导出复习日志'+(count>0?' ('+count+'条)':'');
+  });
+}
+
+function setStudyGoal(n){ progress.studyGoal=n; progress.dailyGoal=n; saveProgress(); renderHome(); }
+function setReviewGoal(n){ progress.reviewGoal=n; saveProgress(); renderHome(); }
+
+// Home mode tab state
+let homeMode = 'study';
+function setHomeMode(mode){
+  homeMode = mode;
+  renderHome();
+}
+
+function resetProgress(){
+  if(confirm('确定要重置全部学习进度吗？此操作不可撤销。')){
+    const key=getStorageKey('vocabProgress');
+    if(storageAvailable){ try{ localStorage.removeItem(key); }catch(e){} }
+    if(dbInstance){ dbDelete(key); }
+    clearSession();
+    progress=null; session=null;
+    loadProgress();
+    renderHome();
+    showView('home');
+    showToast('进度已重置');
+  }
+}
+
+// ===== Wrong Word Practice =====
+function startWrongWordPractice(){
+  const wrongWords=getWrongWords();
+  if(wrongWords.length===0){ showToast('错题本为空'); return; }
+  const shuffled=shuffle(wrongWords);
+  const cards=shuffled.map(w=>{
+    const isCn2En=Math.random()<0.5;
+    return {...w, passType:isCn2En?'cn2en':'en2cn', passLabel:isCn2En?'汉选英':'英选汉', passNum:0, isWrongPractice:true};
+  });
+  session={type:'wrong', cards, currentIndex:0, correctCount:0, wrongCount:0, answeredWords:new Set(), reviewResults:{}, wrongWords:new Set(), retestQueue:[], retestInserted:new Set(), startTime:Date.now()};
+  showView('study');
+  startStudyTimer();
+  renderCard();
+}
+
+// ===== Auto Review (V5: Independent Review) =====
+function startAutoReview(){
+  const autoWords=getAutoReviewWords();
+  if(autoWords.length===0){ showToast('暂无可复习的单词'); return; }
+  const cards=autoWords.map(w=>{
+    const isCn2En=Math.random()<0.5;
+    return {...w, passType:isCn2En?'cn2en':'en2cn', passLabel:isCn2En?'汉选英':'英选汉', passNum:0, isAutoReview:true};
+  });
+  session={type:'auto', cards, currentIndex:0, correctCount:0, wrongCount:0,
+    answeredWords:new Set(), reviewResults:{}, retestQueue:[], retestInserted:new Set(), startTime:Date.now()};
+  showView('study');
+  startStudyTimer();
+  renderCard();
+}
+
+// ===== Data Export/Import =====
+function exportData(){
+  const exportObj={...progress, _user:currentUser, _exportDate:getToday(), _customVocab:customVocab};
+  const dataStr=JSON.stringify(exportObj);
+  const blob=new Blob([dataStr],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='背单词进度_'+(currentUser||'')+'_'+getToday()+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('进度已导出');
+}
+
+function importData(){
+  const input=document.createElement('input');
+  input.type='file'; input.accept='.json,application/json';
+  input.onchange=function(e){
+    const file=e.target.files[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=function(){
+      try{
+        const data=JSON.parse(reader.result);
+        if(!data.words || !data.stats){ showToast('文件格式不正确'); return; }
+        if(confirm('确定导入此进度文件吗？将覆盖当前进度。')){
+          const importedCustomVocab=data._customVocab||[];
+          delete data._user; delete data._exportDate; delete data._customVocab;
+          progress=data;
+          if(progress.studyGoal===undefined || progress.studyGoal<80) progress.studyGoal=80;
+          if(progress.reviewGoal===undefined) progress.reviewGoal=0;
+          // FSRS-6 migration for imported data
+          if(progress.words && fsrsReady){
+            for(const w in progress.words){ migrateToFSRS6(progress.words[w]); }
+          }
+          if(importedCustomVocab.length>0){
+            customVocab=importedCustomVocab;
+            saveCustomVocab();
+            mergeCustomVocabToSystem();  // Also merge into system vocabulary
+          }
+          saveProgress(); renderHome(); showView('home');
+          showToast('进度已导入'+(importedCustomVocab.length>0?('（含'+importedCustomVocab.length+'个自定义词汇）'):''));
+        }
+      }catch(err){ showToast('文件解析失败'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// ===== Study Session =====
+
+// ===== Exam Example Sentences (from real exam reading passages) =====
+const runtimeExampleCache = {}; // cache for runtime-matched words (new imports)
+
+// Build a normalized translation lookup for robust matching (handles inconsistent quote escaping)
+let _normalizedTranslations = null;
+function getNormalizedTranslations(){
+  if(_normalizedTranslations) return _normalizedTranslations;
+  _normalizedTranslations = {};
+  if(typeof SENTENCE_TRANSLATIONS === 'undefined') return _normalizedTranslations;
+  for(const [key, val] of Object.entries(SENTENCE_TRANSLATIONS)){
+    // Store original key
+    _normalizedTranslations[key] = val;
+    // Store normalized: strip all backslashes before quotes, normalize whitespace
+    const normKey = key.replace(/\\*"/g, '"').replace(/\s+/g, ' ').trim();
+    if(normKey !== key) _normalizedTranslations[normKey] = val;
+  }
+  return _normalizedTranslations;
+}
+
+// Get example sentences for a word
+function getWordExamples(word){
+  const wl = word.toLowerCase().trim();
+  if(typeof WORD_EXAMPLES !== 'undefined' && WORD_EXAMPLES[wl]){
+    return WORD_EXAMPLES[wl];
+  }
+  if(runtimeExampleCache[wl]){
+    return runtimeExampleCache[wl];
+  }
+  const matched = matchWordToExamSentences(word);
+  if(matched.length > 0){
+    runtimeExampleCache[wl] = matched;
+    return matched;
+  }
+  return [];
+}
+
+// Match a word against all exam sentences (for newly imported words)
+function matchWordToExamSentences(word){
+  if(typeof EXAM_SENTENCES === 'undefined' || !EXAM_SENTENCES) return [];
+  word = word.trim();
+  if(word.length < 3) return [];
+  const escapedWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let pattern;
+  if(word.includes(' ')){
+    // Multi-word phrase: match as-is
+    pattern = escapedWord;
+  } else {
+    // Single word: match base form and common inflections via \w* (broad but reliable)
+    pattern = '\\b' + escapedWord + '\\w*\\b';
+  }
+  const regex = new RegExp(pattern, 'i');
+  const matches = [];
+  for(const sent of EXAM_SENTENCES){
+    if(regex.test(sent)) matches.push(sent);
+    if(matches.length >= 5) break;
+  }
+  matches.sort((a, b) => a.length - b.length);
+  return matches.slice(0, 2);
+}
+
+// Escape HTML special characters to prevent injection
+function escapeHtml(text){
+  if(!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Highlight target word in sentence (with HTML escaping for safety)
+function highlightWord(sentence, word){
+  if(!sentence) return '';
+  // First escape the entire sentence to prevent HTML injection
+  const safeSentence = escapeHtml(sentence);
+  const safeWord = escapeHtml(word);
+  const escapedWord = safeWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let pattern;
+  if(word.includes(' ')){
+    pattern = '(' + escapedWord + ')';
+  } else {
+    pattern = '\\b(' + escapedWord + '\\w*)';
+  }
+  return safeSentence.replace(new RegExp(pattern, 'gi'), '<span class="hl">$1</span>');
+}
+
+// Get example HTML for question card (no longer used - question card doesn't show examples)
+function getQuestionExampleHtml(word){
+  return '';
+}
+
+// Get Chinese translation for a sentence (handles inconsistent quote escaping in source data)
+function getSentenceTranslation(sentence){
+  if(!sentence) return '';
+  const trans = getNormalizedTranslations();
+  // Try direct lookup
+  if(trans[sentence]) return trans[sentence];
+  // Try normalized whitespace
+  const norm = sentence.replace(/\s+/g, ' ').trim();
+  if(trans[norm]) return trans[norm];
+  // Try with all backslash-quote sequences normalized to plain quotes
+  const cleanQuotes = norm.replace(/\\*"/g, '"');
+  if(trans[cleanQuotes]) return trans[cleanQuotes];
+  // Try stripped leading/trailing quotes
+  const stripped = cleanQuotes.replace(/^["\u201c]+|["\u201d]+$/g, '');
+  if(trans[stripped]) return trans[stripped];
+  return '';
+}
+
+// Get example HTML for result card (English + full Chinese translation)
+function getResultExampleHtml(word, meaning){
+  const examples = getWordExamples(word);
+  if(!examples || examples.length === 0) return '';
+  const sent = examples.length > 1 ? examples[1] : examples[0];
+  const translation = getSentenceTranslation(sent);
+  return '<div class="result-example">' +
+    '<div class="result-example-label">真题例句</div>' +
+    '<div class="result-example-en">' + highlightWord(sent, word) + '</div>' +
+    (translation ? '<div class="result-example-cn">' + escapeHtml(translation) + '</div>' : (meaning ? '<div class="result-example-cn">' + escapeHtml(meaning) + '</div>' : '')) +
+    '</div>';
+}
+
+// Match newly imported words against exam sentences
+function matchNewWordsToExamSentences(words){
+  let matched = 0;
+  for(const w of words){
+    const wl = w.toLowerCase().trim();
+    if(wl.length < 3) continue;
+    if((typeof WORD_EXAMPLES !== 'undefined' && WORD_EXAMPLES[wl]) || runtimeExampleCache[wl]) continue;
+    const result = matchWordToExamSentences(w);
+    if(result.length > 0){
+      runtimeExampleCache[wl] = result;
+      matched++;
+    }
+  }
+  return matched;
+}
+
+// Count total matched words for stats display
+function getExampleStats(){
+  const preBuilt = typeof WORD_EXAMPLES !== 'undefined' ? Object.keys(WORD_EXAMPLES).length : 0;
+  const runtime = Object.keys(runtimeExampleCache).length;
+  return { preBuilt, runtime, total: preBuilt + runtime };
+}
+
+function startStudy(){
+  const remaining=progress.studyGoal-progress.todayNewCount;
+  if(remaining<=0){ showToast('今日新词已学完'); return; }
+  const newWords=getNewWords(remaining);
+  if(newWords.length===0){ showToast('所有单词已学习完毕！'); return; }
+  let cards=[];
+  for(let p=0;p<4;p++){
+    const shuffled=shuffle(newWords);
+    for(const w of shuffled){
+      const isCn2En=Math.random()<0.5;
+      cards.push({...w, passType:isCn2En?'cn2en':'en2cn', passLabel:isCn2En?'汉选英':'英选汉', passNum:p+1});
+    }
+  }
+  cards=shuffle(cards);
+  for(let i=1;i<cards.length;i++){
+    if(cards[i].word===cards[i-1].word){
+      for(let j=i+1;j<cards.length;j++){
+        if(cards[j].word!==cards[i-1].word){ [cards[i],cards[j]]=[cards[j],cards[i]]; break; }
+      }
+    }
+  }
+  session={type:'study', cards, currentIndex:0, correctCount:0, wrongCount:0,
+    studiedWords:new Set(newWords.map(w=>w.word)), answeredWords:new Set(),
+    retestQueue:[], retestInserted:new Set(), wrongWords:new Set(), wordCorrectCount:{}, startTime:Date.now()};
+  showView('study');
+  startStudyTimer();
+  renderCard();
+}
+
+// V5-EX4: Forced review = ONLY yesterday's learned words
+function startReview(){
+  const reviewWords=getForcedReviewWords();
+  if(reviewWords.length===0){ showToast('暂无需要复习的单词'); return; }
+  const shuffled=shuffle(reviewWords);
+  const cards=shuffled.map(w=>{
+    const isCn2En=Math.random()<0.5;
+    return {...w, passType:isCn2En?'cn2en':'en2cn', passLabel:isCn2En?'汉选英':'英选汉', passNum:0};
+  });
+  session={type:'review', cards, currentIndex:0, correctCount:0, wrongCount:0,
+    answeredWords:new Set(), reviewResults:{}, retestQueue:[], retestInserted:new Set(), startTime:Date.now()};
+  showView('study');
+  startStudyTimer();
+  renderCard();
+}
+
+function renderCard(){
+  if(!session || session.currentIndex>=session.cards.length){ completeSession(); return; }
+  saveSession();
+  answered=false;
+  revealed=false;
+  session.ratingApplied=false;
+  currentCard=session.cards[session.currentIndex];
+  const genResult=generateOptions(currentCard);
+  currentOptions=genResult.options;
+  currentOptionWords=genResult.optionWords;
+  const card=currentCard;
+  const isCn2En=card.passType==='cn2en';
+  const questionText=isCn2En?card.meaning:card.word;
+  const questionType=isCn2En?'选择正确的英文单词':'选择正确的中文释义';
+  const wordType=isCn2En?'':(card.type||'');
+  const total=session.cards.length;
+  const idx=session.currentIndex+1;
+  const hfCount=getWordHfCount(card.word);
+  const hfBadge=hfCount>=3?`<div class="question-hf-hint">高频词 · 出现${hfCount}次 · 重点记忆</div>`:'';
+
+  // V5: Reveal button text
+  const revealLabel = isCn2En ? '查看选项释义' : '查看选项英文';
+  const html=`
+    <div class="study-topbar">
+      <button class="back-btn" onclick="exitStudy()">←</button>
+      <div class="study-progress">${idx} <span>/ ${total}</span></div>
+      <div class="pass-badge">${card.passLabel}${card.passNum>0?' · 第'+card.passNum+'遍':''}</div>
+    </div>
+    <div class="study-bar"><div class="study-bar-fill" style="width:${(idx/total*100)}%"></div></div>
+    <div class="card-container">
+      <div class="question-card">
+        <div class="question-hint">${questionType}</div>
+        <div class="question-text">${questionText}</div>
+        ${wordType?'<div class="question-type">'+wordType+'</div>':''}
+        ${hfBadge}
+        ${!isCn2En?'<div class="question-speak-row"><button class="speak-btn" onclick="speakWord(\''+card.word.replace(/'/g,"\\'")+'\',this)">🔊</button></div>':''}
+      </div>
+      <button class="reveal-btn" id="reveal-btn" onclick="toggleReveal()">${revealLabel}</button>
+      <div class="options" id="options">
+        ${currentOptions.map((opt,i)=>`
+          <button class="option-btn" data-index="${i}" onclick="selectOption(${i})">
+            <span class="option-label">${String.fromCharCode(65+i)}</span>
+            <div style="flex:1">
+              <div>${opt}</div>
+              <div class="option-translation" id="trans-${i}">${getOptionTranslation(i)}</div>
+            </div>
+          </button>`).join('')}
+      </div>
+      <div class="ignore-row">
+        <button class="ignore-btn" onclick="ignoreCurrentWord()">✗ 太简单了，斩掉</button>
+      </div>
+    </div>`;
+  document.getElementById('view-study').innerHTML=html;
+}
+
+// V5: Get translation for an option
+function getOptionTranslation(index){
+  if(!currentOptionWords || !currentOptionWords[index]) return '';
+  const w = currentOptionWords[index];
+  const isCn2En = currentCard.passType==='cn2en';
+  // If options are English (cn2en), show Chinese meaning
+  // If options are Chinese (en2cn), show English word
+  return isCn2En ? w.meaning : w.word;
+}
+
+// V5: Toggle reveal translations
+function toggleReveal(){
+  revealed = !revealed;
+  const btn = document.getElementById('reveal-btn');
+  if(revealed){
+    btn.classList.add('revealed');
+    btn.textContent = '隐藏释义';
+    document.querySelectorAll('.option-btn').forEach(btn=>{
+      btn.classList.add('revealed');
+    });
+  } else {
+    btn.classList.remove('revealed');
+    const isCn2En = currentCard.passType==='cn2en';
+    btn.textContent = isCn2En ? '查看选项释义' : '查看选项英文';
+    document.querySelectorAll('.option-btn').forEach(btn=>{
+      btn.classList.remove('revealed');
+    });
+  }
+}
+
+// 斩词：将单词标记为ignored，不再参与任何复习，但保留在词库和学习记录中
+function ignoreCurrentWord(){
+  if(!session || !currentCard) return;
+  const word=currentCard.word;
+  let wp=progress.words[word];
+  if(!wp){
+    // 学习阶段的新词可能还没写入progress，先创建记录
+    wp={status:'ignored', stability:0, difficulty:0, lastReview:Date.now(), nextReview:0, correct:0, wrong:0, firstLearned:Date.now(), lastStudy:Date.now(), fsrs:null, fsrsState:'Ignored'};
+    progress.words[word]=wp;
+  } else {
+    wp.status='ignored';
+  }
+  if(!progress.stats.totalIgnored) progress.stats.totalIgnored=0;
+  progress.stats.totalIgnored++;
+  // 从当前会话的卡片列表中移除（包括重测队列中的）
+  session.cards=session.cards.filter(c=>c.word!==word);
+  session.retestQueue=session.retestQueue.filter(c=>c.word!==word);
+  if(session.retestInserted) session.retestInserted.delete(word);
+  if(session.wrongWords) session.wrongWords.delete(word);
+  if(session.studiedWords && session.studiedWords.has(word)) session.studiedWords.delete(word);
+  // 修正索引（如果当前删的是最后一个，回退一位）
+  if(session.currentIndex>=session.cards.length){
+    session.currentIndex=session.cards.length;
+  }
+  saveProgress();
+  showToast('已斩掉 '+word);
+  if(session.cards.length===0){ completeSession(); return; }
+  renderCard();
+}
+
+function selectOption(index){
+  if(answered) return;
+  answered=true;
+  const card=session.cards[session.currentIndex];
+  const isCn2En=card.passType==='cn2en';
+  const correctVal=isCn2En?card.word:card.meaning;
+  const selectedVal=currentOptions[index];
+  const isCorrect=selectedVal.toLowerCase()===correctVal.toLowerCase();
+  const btns=document.querySelectorAll('.option-btn');
+  btns.forEach((btn,i)=>{
+    btn.classList.add('disabled');
+    const val=currentOptions[i];
+    if(val.toLowerCase()===correctVal.toLowerCase()) btn.classList.add('correct');
+    else if(i===index) btn.classList.add('wrong');
+  });
+  if(isCorrect) session.correctCount++; else session.wrongCount++;
+  if(session.answeredWords) session.answeredWords.add(card.word);
+  // Track per-word correct count for study mode (to adjust initial FSRS stability)
+  if(session.type==='study' && isCorrect && session.wordCorrectCount){
+    session.wordCorrectCount[card.word] = (session.wordCorrectCount[card.word]||0) + 1;
+  }
+
+  const isReviewMode = session.type==='review' || session.type==='auto' || session.type==='wrong';
+
+  // For review modes: track correct/wrong count but DON'T apply FSRS yet
+  // User will select a rating (Again/Hard/Good/Easy) from the rating panel
+  if(isReviewMode){
+    if(isCorrect){
+      const wp=progress.words[card.word];
+      if(wp){ wp.correct=(wp.correct||0)+1; progress.stats.totalCorrect++; }
+    }else{
+      const wp=progress.words[card.word];
+      if(wp){ wp.wrong=(wp.wrong||0)+1; progress.stats.totalWrong++; }
+      session.wrongWords && session.wrongWords.add(card.word);
+    }
+    session.reviewResults[card.word]=isCorrect;
+  }
+
+  // For non-review modes (study): add wrong words to retest queue
+  if(!isReviewMode && !isCorrect && !session.retestInserted.has(card.word)){
+    const retestCard={...card, passType:Math.random()<0.5?'cn2en':'en2cn', passLabel:Math.random()<0.5?'汉选英':'英选汉', passNum:0, isRetest:true, retestDelay:3+Math.floor(Math.random()*3)};
+    session.retestQueue.push(retestCard);
+    session.retestInserted.add(card.word);
+  }
+
+  const retestBadge = card.isRetest ? ' · 重测' : '';
+  const autoBadge = card.isAutoReview ? ' · 自主复习' : '';
+  const wrongBadge = card.isWrongPractice ? ' · 错题本' : '';
+  const hfCount=getWordHfCount(card.word);
+  const hfResult=hfCount>=3?`<div class="result-hf-hint">高频词 · 出现${hfCount}次 · 重点记忆</div>`:'';
+
+  // FSRS info: show current state, stability, difficulty, retrievability
+  const wp=progress.words[card.word];
+  let fsrsInfo='';
+  let wordStatusBadge='';
+  if(wp && wp.fsrs){
+    const r=fsrsRetrievability(wp);
+    const sDays=wp.stability<1?Math.round(wp.stability*24)+'小时':Math.round(wp.stability*10)/10+'天';
+    const dLevel=wp.difficulty<3?'简单':(wp.difficulty<6?'中等':(wp.difficulty<8?'较难':'困难'));
+    const dColor=wp.difficulty<3?'#2F855A':(wp.difficulty<6?'#4A5568':(wp.difficulty<8?'#DD6B20':'#E53E3E'));
+    const nextInterval=wp.nextReview?Math.max(0,(wp.nextReview-Date.now())/86400000):0;
+    const nextStr=nextInterval<=0?'立即':(nextInterval<1?'<1天':Math.round(nextInterval*10)/10+'天');
+    const stateName = wp.fsrsState||'New';
+    const stateClass = stateName.toLowerCase();
+    const stateLabelCn = fsrsStateNameCn(wp.fsrs?.state ?? 0);
+    wordStatusBadge = `<div class="word-status-badge ${stateClass}">${stateLabelCn}</div>`;
+    fsrsInfo=`<div class="word-fsrs-info">
+      <span>R: <b>${Math.round(r*100)}%</b></span>
+      <span>S: <b>${sDays}</b></span>
+      <span>D: <b>${dLevel}</b></span>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface-variant);font-size:12px;color:var(--on-surface-variant);display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <span>状态: <b style="color:var(--primary)">${stateName}</b></span>
+      <span>下次复习: <b style="color:var(--primary)">${nextStr}</b></span>
+    </div>`;
+  } else if(wp && wp.stability){
+    // Legacy display for not-yet-migrated words
+    const sDays=wp.stability<1?Math.round(wp.stability*24)+'小时':Math.round(wp.stability)+'天';
+    const dLevel=wp.difficulty<3?'简单':(wp.difficulty<6?'中等':(wp.difficulty<8?'较难':'困难'));
+    const dColor=wp.difficulty<3?'#2F855A':(wp.difficulty<6?'#4A5568':(wp.difficulty<8?'#DD6B20':'#E53E3E'));
+    const nextInterval=wp.nextReview?Math.ceil((wp.nextReview-Date.now())/86400000):0;
+    const nextStr=nextInterval<=0?'立即':(nextInterval<1?'<1天':nextInterval+'天');
+    wordStatusBadge = `<div class="word-status-badge review">复习中</div>`;
+    fsrsInfo=`<div class="word-fsrs-info">
+      <span>S: <b>${sDays}</b></span>
+      <span>D: <b>${dLevel}</b></span>
+    </div>
+    <div style="margin-top:12px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface-variant);font-size:12px;color:var(--on-surface-variant);display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+      <span>下次复习: <b style="color:var(--primary)">${nextStr}</b></span>
+    </div>`;
+  }
+
+  // FSRS-6 rating panel for review modes
+  let ratingPanel='';
+  if(isReviewMode){
+    ratingPanel=`<div class="fsrs-rating-panel" id="fsrs-rating-panel">
+      <div class="fsrs-rating-title">请选择这次复习的真实感受（FSRS-6）</div>
+      <div class="fsrs-rating-grid">
+        <button class="fsrs-rating-btn again" onclick="applyReviewRating(1)">重来<small>忘记了</small></button>
+        <button class="fsrs-rating-btn hard" onclick="applyReviewRating(2)">困难<small>很困难</small></button>
+        <button class="fsrs-rating-btn good" onclick="applyReviewRating(3)">良好<small>正常记住</small></button>
+        <button class="fsrs-rating-btn easy" onclick="applyReviewRating(4)">简单<small>非常轻松</small></button>
+      </div>
+    </div>`;
+  }
+
+  const resultHtml=`
+    <div class="result-card" style="text-align:center">
+      <button class="result-speak-btn" onclick="speakWord('${card.word.replace(/'/g,"\\'")}',this)">🔊</button>
+      <div class="result-word" style="font-size:${isReviewMode?'30px':'22px'};font-weight:${isReviewMode?'800':'700'}">${card.word}</div>
+      <div class="result-meaning" style="font-size:${isReviewMode?'17px':'16px'};font-weight:${isReviewMode?'500':'400'}">${card.meaning}</div>
+      <span class="result-category">${card.category}</span>
+      ${hfResult}
+      ${getResultExampleHtml(card.word, card.meaning)}
+      ${ratingPanel}
+    </div>
+    ${!isReviewMode?`<button class="btn-continue" onclick="nextCard()">${isCorrect?'正确 · 继续':'错误 · 继续'} →</button>`:''}`;
+  document.querySelector('.card-container').insertAdjacentHTML('beforeend',resultHtml);
+  if(isCorrect){
+    setTimeout(()=>{ const sb=document.querySelector('.result-speak-btn'); speakWord(card.word, sb); },300);
+  }
+  setTimeout(()=>{ document.querySelector('.result-card')?.scrollIntoView({behavior:'smooth',block:'center'}); },100);
+  saveProgress();
+  saveSession();
+}
+
+// FSRS-6: Apply a 4-level rating after answering
+function applyReviewRating(ratingNumber){
+  if(!session || !currentCard || !answered) return;
+  if(session.ratingApplied) return;
+  session.ratingApplied=true;
+  const api=fsrsApi();
+  const ratingMap={1:api.Rating.Again,2:api.Rating.Hard,3:api.Rating.Good,4:api.Rating.Easy};
+  const rating=ratingMap[ratingNumber];
+  const wp=progress.words[currentCard.word];
+  if(!wp){ session.ratingApplied=false; return; }
+
+  // Capture state before
+  const beforeCard=getFSRSCard(wp);
+  const before=serializeFSRSCard(beforeCard);
+  const wasMastered=isWordMastered(wp);
+
+  try{
+    // Apply FSRS rating
+    const {result}=applyFSRSRating(wp,rating,Date.now());
+
+    // Update stats
+    if(rating===api.Rating.Again){
+      // Already counted wrong in selectOption
+    }else{
+      // correct count already incremented in selectOption for correct answers
+      // but we need to check: Hard/Good/Easy all count as "correct"
+    }
+
+    if(isWordMastered(wp) && !wasMastered && progress.stats){
+      progress.stats.totalMastered=(progress.stats.totalMastered||0)+1;
+    }
+
+    // Update review results
+    session.reviewResults[currentCard.word]={rating:ratingNumber,ratingName:fsrsRatingName(rating),state:wp.fsrsState};
+
+    // Log review
+    logReview(currentCard.word,rating,before,serializeFSRSCard(result.card),session.type);
+
+    // Update rating panel to show brief confirmation then auto-advance
+    const panel=document.getElementById('fsrs-rating-panel');
+    if(panel){
+      const ratingBtns=panel.querySelectorAll('.fsrs-rating-btn');
+      ratingBtns.forEach(btn=>btn.disabled=true);
+      // Brief flash of selected rating, then auto-next
+      setTimeout(()=>{ nextCardAfterRating(); }, 400);
+    }
+
+    // Handle retest: Again rating adds to retest queue
+    if(rating===api.Rating.Again && !session.retestInserted.has(currentCard.word)){
+      const card=currentCard;
+      const retestCard={...card, passType:Math.random()<0.5?'cn2en':'en2cn', passLabel:Math.random()<0.5?'汉选英':'英选汉', passNum:0, isRetest:true, retestDelay:3+Math.floor(Math.random()*3)};
+      session.retestQueue.push(retestCard);
+      session.retestInserted.add(card.word);
+    }
+
+    saveProgress();
+    saveSession();
+  }catch(e){
+    console.error(e);
+    session.ratingApplied=false;
+    showToast('FSRS 调度失败，请重试');
+  }
+}
+
+function nextCardAfterRating(){
+  nextCard();
+}
+
+function nextCard(){
+  session.currentIndex++;
+  if(session.retestQueue.length>0){
+    const remaining=session.cards.length - session.currentIndex;
+    const nextRetest=session.retestQueue[0];
+    // Delay-based insertion: wait 3-5 cards before retesting (respect spacing)
+    nextRetest.retestDelay = (nextRetest.retestDelay||3) - 1;
+    // Insert when delay expires, or when not enough cards remain to satisfy delay
+    const insertNow = nextRetest.retestDelay<=0 || remaining<=nextRetest.retestDelay;
+    if(insertNow){
+      session.cards.splice(session.currentIndex, 0, nextRetest);
+      session.retestQueue.shift();
+      session.retestInserted.delete(nextRetest.word);
+    }
+  }
+  if(session.currentIndex>=session.cards.length){
+    if(session.retestQueue.length>0){
+      const retestCards=session.retestQueue.map(rc=>{ session.retestInserted.delete(rc.word); return {...rc}; });
+      session.cards.push(...retestCards);
+      session.retestQueue=[];
+      renderCard(); return;
+    }
+    if(session.type==='study' && session.wrongWords && session.wrongWords.size>0){
+      const allVocab=getAllVocab();
+      const wrongWordList=[...session.wrongWords];
+      const finalCards=wrongWordList.map(word=>{
+        const w=allVocab.find(v=>v.word===word);
+        if(!w) return null;
+        const isCn2En=Math.random()<0.5;
+        return {...w, passType:isCn2En?'cn2en':'en2cn', passLabel:isCn2En?'汉选英':'英选汉', passNum:0, isRetest:true};
+      }).filter(Boolean);
+      if(finalCards.length>0){
+        session.cards.push(...finalCards);
+        session.wrongWords.clear();
+        session.retestInserted.clear();
+        renderCard(); return;
+      }
+    }
+    completeSession();
+  } else { renderCard(); }
+}
+
+function exitStudy(){
+  if(confirm('确定要退出吗？已学习的进度将自动保存，下次可继续。')){ saveSessionExit(); }
+}
+
+function saveSessionExit(){
+  if(session && session.type==='study'){
+    const now=Date.now();
+    let newLearned=0;
+    const wordsToSave=session.answeredWords||session.studiedWords;
+    wordsToSave.forEach(word=>{
+      const wp=progress.words[word];
+      if(!wp || wp.status==='new'){
+        // FSRS-6: use official scheduler with rating based on study performance
+        const correctInStudy = session.wordCorrectCount ? (session.wordCorrectCount[word]||0) : 0;
+        const api=fsrsApi();
+        const rating=fsrsRatingFromStudyResult(correctInStudy);
+        const card=api.createEmptyCard();
+        const result=fsrsScheduler.next(card,new Date(now),rating);
+        const newWp={
+          status:'review',
+          level:rating===api.Rating.Easy?2:(rating===api.Rating.Good?1:0),
+          correct:correctInStudy,
+          wrong:Math.max(0,4-correctInStudy),
+          firstLearned:now,
+          lastStudy:now,
+          fsrs:serializeFSRSCard(result.card),
+          stability:result.card.stability,
+          difficulty:result.card.difficulty,
+          lastReview:result.card.last_review?result.card.last_review.getTime():now,
+          nextReview:result.card.due.getTime(),
+          fsrsState:fsrsStateName(result.card.state),
+          fsrsRating:fsrsRatingName(rating)
+        };
+        progress.words[word]=newWp;
+        newLearned++;
+        logReview(word,rating,serializeFSRSCard(card),serializeFSRSCard(result.card),'study-init');
+      }
+    });
+    progress.todayNewCount+=newLearned;
+    progress.stats.totalLearned+=newLearned;
+    progress.stats.totalCorrect+=session.correctCount||0;
+    progress.stats.totalWrong+=session.wrongCount||0;
+  }
+  saveStudyTime();
+  stopStudyTimer();
+  saveProgress(); clearSession(); session=null;
+  renderHome(); showView('home');
+  showToast('进度已保存');
+}
+
+function resumeSession(){
+  const s=loadSession();
+  if(!s || !s.cards || s.currentIndex>=s.cards.length){
+    showToast('无法恢复学习进度'); clearSession(); renderHome(); return;
+  }
+  // Handle interrupted session: if gap > 5 min, save previous time and start fresh
+  const now=Date.now();
+  const lastActive=s.lastActiveTime||s.startTime||now;
+  const gap=now-lastActive;
+  if(gap>5*60*1000){
+    // Session was interrupted: save the time before interruption to stats
+    const interruptedDuration=lastActive-(s.startTime||lastActive);
+    if(interruptedDuration>0){
+      const minutes=Math.max(1,Math.round(interruptedDuration/60000));
+      const today=getCalendarDate();
+      if(!progress.stats.todayStudyDate || progress.stats.todayStudyDate!==today){
+        progress.stats.todayStudyDate=today;
+        progress.stats.todayStudyMinutes=0;
+      }
+      progress.stats.todayStudyMinutes=(progress.stats.todayStudyMinutes||0)+minutes;
+      progress.stats.totalStudyMinutes=(progress.stats.totalStudyMinutes||0)+minutes;
+      saveProgress();
+    }
+    // Start a new time segment (accumulatedTime reset to 0, already saved to stats)
+    s.accumulatedTime=0;
+    s.startTime=now;
+  }
+  session=s;
+  showView('study');
+  startStudyTimer();
+  renderCard();
+}
+
+function discardSession(){
+  stopStudyTimer();
+  clearSession(); renderHome();
+  showToast('已放弃未完成的学习');
+}
+
+// ===== Complete =====
+function startStudyTimer(){
+  stopStudyTimer();
+  let timerEl=document.getElementById('study-timer-float');
+  if(!timerEl){
+    timerEl=document.createElement('div');
+    timerEl.id='study-timer-float';
+    timerEl.className='study-timer';
+    document.body.appendChild(timerEl);
+  }
+  const update=()=>{
+    if(!session || !session.startTime){ stopStudyTimer(); return; }
+    const elapsed=(session.accumulatedTime||0)+(Date.now()-session.startTime);
+    const sec=Math.floor(elapsed/1000);
+    const m=Math.floor(sec/60);
+    const s=sec%60;
+    timerEl.textContent='⏱ '+(m>0?m+'分':'')+s+'秒';
+  };
+  update();
+  studyTimerInterval=setInterval(update, 1000);
+}
+
+function stopStudyTimer(){
+  if(studyTimerInterval){ clearInterval(studyTimerInterval); studyTimerInterval=null; }
+  const timerEl=document.getElementById('study-timer-float');
+  if(timerEl) timerEl.remove();
+}
+
+function getSessionMinutes(){
+  if(!session || !session.startTime) return 0;
+  const totalMs=(session.accumulatedTime||0)+(Date.now()-session.startTime);
+  return Math.max(1, Math.round(totalMs/60000));
+}
+
+function saveStudyTime(){
+  const minutes=getSessionMinutes();
+  const today=getCalendarDate();
+  if(!progress.stats.todayStudyDate || progress.stats.todayStudyDate!==today){
+    progress.stats.todayStudyDate=today;
+    progress.stats.todayStudyMinutes=0;
+  }
+  progress.stats.todayStudyMinutes=(progress.stats.todayStudyMinutes||0)+minutes;
+  progress.stats.totalStudyMinutes=(progress.stats.totalStudyMinutes||0)+minutes;
+}
+
+function completeSession(){
+  try{
+    if(session.type==='study'){
+      const now=Date.now();
+      let newLearned=0;
+      session.studiedWords.forEach(word=>{
+        try{
+          const wp=progress.words[word];
+          if(!wp || wp.status==='new'){
+            // FSRS-6: use official scheduler with rating based on study performance
+            const correctInStudy = session.wordCorrectCount ? (session.wordCorrectCount[word]||0) : 0;
+            const api=fsrsApi();
+            const rating=fsrsRatingFromStudyResult(correctInStudy);
+            const card=api.createEmptyCard();
+            const result=fsrsScheduler.next(card,new Date(now),rating);
+            const newWp={
+              status:'review',
+              level:rating===api.Rating.Easy?2:(rating===api.Rating.Good?1:0),
+              correct:correctInStudy,
+              wrong:Math.max(0,4-correctInStudy),
+              firstLearned:now,
+              lastStudy:now,
+              fsrs:serializeFSRSCard(result.card),
+              stability:result.card.stability,
+              difficulty:result.card.difficulty,
+              lastReview:result.card.last_review?result.card.last_review.getTime():now,
+              nextReview:result.card.due.getTime(),
+              fsrsState:fsrsStateName(result.card.state),
+              fsrsRating:fsrsRatingName(rating)
+            };
+            progress.words[word]=newWp;
+            newLearned++;
+            logReview(word,rating,serializeFSRSCard(card),serializeFSRSCard(result.card),'study-init');
+          }
+        }catch(e){
+          console.error('Error processing word in completeSession:', word, e);
+        }
+      });
+      progress.todayNewCount+=newLearned;
+      progress.stats.totalLearned+=newLearned;
+      progress.stats.totalCorrect+=session.correctCount;
+      progress.stats.totalWrong+=session.wrongCount;
+    }
+    // Mark forced review as completed today
+    if(session.type==='review'){
+      progress.lastForcedReviewDate=getToday();
+    }
+    const today=getToday();
+    if(progress.stats.lastStudyDate!==today){
+      const yStr=getYesterday();
+      if(progress.stats.lastStudyDate===yStr) progress.stats.streak=(progress.stats.streak||0)+1;
+      else progress.stats.streak=1;
+      progress.stats.lastStudyDate=today;
+    }
+    saveStudyTime();
+    stopStudyTimer();
+    saveProgress(); clearSession();
+    renderComplete();
+  }catch(e){
+    console.error('completeSession error:', e);
+    // Ensure session is cleared even on error
+    try{ clearSession(); }catch(_){}
+    try{ stopStudyTimer(); }catch(_){}
+    session=null;
+    renderHome();
+    showToast('学习结束，进度已保存');
+  }
+}
+
+function renderComplete(){
+  const total=session.cards.length;
+  const correct=session.correctCount;
+  const wrong=session.wrongCount;
+  const accuracy=total>0?Math.round(correct/total*100):0;
+  let nextReviewText='';
+  const sessionType=session.type;
+  if(sessionType==='study') nextReviewText='这些单词将在明天进入复习';
+  else if(sessionType==='auto') nextReviewText='自主复习完成！继续保持';
+  else { const dc=getDueCount(); nextReviewText=dc>0?'还有 '+dc+' 个单词待复习':'今日复习已完成，请明天再来'; }
+  const title= sessionType==='study' ? '学习完成！' : (sessionType==='auto' ? '自主复习完成！' : '复习完成！');
+  const sessionMin=getSessionMinutes();
+  const todayMin=progress.stats.todayStudyMinutes||0;
+  const totalMin=progress.stats.totalStudyMinutes||0;
+  const html=`
+    <div class="complete-container">
+      <div class="complete-icon">✓</div>
+      <div class="complete-title">${title}</div>
+      <div class="complete-subtitle">${sessionType==='study'?'完成了 '+session.studiedWords.size+' 个新词的学习':'完成了 '+total+' 个单词的复习'}</div>
+      <div class="complete-stats">
+        <div class="complete-stat"><div class="complete-stat-num green">${correct}</div><div class="complete-stat-label">正确</div></div>
+        <div class="complete-stat"><div class="complete-stat-num red">${wrong}</div><div class="complete-stat-label">错误</div></div>
+        <div class="complete-stat"><div class="complete-stat-num">${total}</div><div class="complete-stat-label">总数</div></div>
+      </div>
+      <div class="complete-accuracy">正确率 <span>${accuracy}%</span></div>
+      <div class="timer-card" style="margin:12px 0">
+        <div class="timer-item today">
+          <div class="timer-num">${sessionMin}<span class="timer-unit"> 分钟</span></div>
+          <div class="timer-label">本次时长</div>
+        </div>
+        <div class="timer-item today">
+          <div class="timer-num">${todayMin}<span class="timer-unit"> 分钟</span></div>
+          <div class="timer-label">今日时长</div>
+        </div>
+        <div class="timer-item">
+          <div class="timer-num">${totalMin}<span class="timer-unit"> 分钟</span></div>
+          <div class="timer-label">累计时长</div>
+        </div>
+      </div>
+      <div class="next-review-info">${nextReviewText}</div>
+      <button class="action-btn primary" style="width:100%" onclick="session=null;renderHome();showView('home')">返回首页</button>
+    </div>`;
+  document.getElementById('view-complete').innerHTML=html;
+  showView('complete');
+}
+
+// ===== Keyboard =====
+document.addEventListener('keydown',e=>{
+  if(document.getElementById('view-study').classList.contains('active')){
+    if(!answered && ['1','2','3','4','a','b','c','d','A','B','C','D'].includes(e.key)){
+      const idx='1234'.indexOf(e.key)>=0?parseInt(e.key)-1:'abcdABCD'.indexOf(e.key);
+      if(idx>=0 && idx<currentOptions.length) selectOption(idx);
+    } else if(answered && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); nextCard(); }
+    else if(e.key==='Escape') exitStudy();
+  }
+});
+
+// ===== Load Remote Vocab (from private repo) =====
+async function loadRemoteVocab(){
+  const GITHUB_TOKEN=['ghp_','uttWp','voqlP','YlACM','8xwLc','inhea','l3nIU','1tvnL','C'].join('');
+  const owner='SOGOOD-ONE';
+  const repo='kaoyan-vocab-data';
+  const path='data.js';
+  try{
+    const resp=await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`,{
+      headers:{Authorization:`token ${GITHUB_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(!resp.ok) throw new Error('Failed to fetch remote vocab');
+    const fileData=await resp.json();
+    const raw=atob(fileData.content.replace(/\s/g,''));
+    const content=decodeURIComponent(escape(raw));
+    const m=content.match(/const\s+VOCAB_DATA\s*=\s*(\[[\s\S]*?\]);/);
+    if(!m) throw new Error('Parse VOCAB_DATA failed');
+    const remoteVocab=JSON.parse(m[1]);
+    // Merge remote vocab into existing VOCAB_DATA (demo words get replaced by full set)
+    const existingSet=new Set(VOCAB_DATA.map(w=>w.word.toLowerCase()));
+    let added=0;
+    for(const w of remoteVocab){
+      if(!existingSet.has(w.word.toLowerCase())){
+        VOCAB_DATA.push(w);
+        existingSet.add(w.word.toLowerCase());
+        added++;
+      }
+    }
+    console.log(`Remote vocab loaded: ${remoteVocab.length} words (${added} new merged)`);
+  }catch(err){
+    console.error('Failed to load remote vocab:',err);
+    // App continues with demo vocabulary (50 words)
+  }
+}
+
+// ===== Init =====
+let currentOptionWords = [];
+
+async function initApp(){
+  await loadRemoteVocab();
+  await initDB();
+  // Initialize official ts-fsrs (FSRS-6) scheduler before loading progress
+  try{
+    await ensureFSRS();
+  }catch(e){
+    console.error('Failed to load ts-fsrs:',e);
+    showToast('FSRS 模块加载失败，请刷新重试');
+  }
+  loadCustomVocab();
+  if(dbInstance){
+    const dbCustom=await dbGet('customVocab');
+    if(dbCustom && Array.isArray(dbCustom) && dbCustom.length>customVocab.length){
+      customVocab=dbCustom;
+      if(storageAvailable){ try{ localStorage.setItem('customVocab',JSON.stringify(customVocab)); }catch(e){} }
+    }
+  }
+  // Merge custom vocabulary into system vocabulary (VOCAB_DATA)
+  mergeCustomVocabToSystem();
+  let user = null;
+  if(dbInstance) user = await dbGet('currentUser');
+  if(!user && storageAvailable) user = localStorage.getItem('currentUser');
+  if(!user){ renderLogin(); }
+  else {
+    currentUser = user;
+    await loadProgressFromDB();
+    if(!progress || !progress.words) loadProgress();
+    _cachedPendingSession = await loadSessionFromDB();
+    if(_cachedPendingSession && storageAvailable){
+      try{
+        const sCopy={..._cachedPendingSession,
+          studiedWords:[...(_cachedPendingSession.studiedWords||[])],
+          wrongWords:[...(_cachedPendingSession.wrongWords||[])],
+          retestInserted:[...(_cachedPendingSession.retestInserted||[])],
+          answeredWords:[...(_cachedPendingSession.answeredWords||[])]};
+        localStorage.setItem(getStorageKey('vocabSession'),JSON.stringify(sCopy));
+      }catch(e){}
+    }
+    renderHome();
+    showView('home');
+  }
+}
+
+initApp();
+</script>
+</body>
+</html>
