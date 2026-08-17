@@ -1,5 +1,24 @@
 export const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
+// crypto.randomUUID() is unavailable on some non-secure HTTP origins.
+// Install a local fallback once this module is loaded so the existing UI
+// can keep using crypto.randomUUID() without changing the page implementation.
+function ensureRandomUUID() {
+  if (typeof globalThis.crypto === "undefined") return;
+  if (typeof globalThis.crypto.randomUUID === "function") return;
+  const cryptoLike = globalThis.crypto as Crypto & { randomUUID?: () => string };
+  try {
+    cryptoLike.randomUUID = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      const v = c === "x" ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  } catch {
+    // The caller can still handle environments where Crypto is not extensible.
+  }
+}
+ensureRandomUUID();
+
 type ReviewIdentity = { id: string; wordId: string; reviewedAt: number };
 
 function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | undefined {
