@@ -32,19 +32,14 @@ function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | un
 
 async function afterAuthenticatedReview(path: string, payload: unknown) {
   if (path !== "/reviews" || !payload || typeof payload !== "object") return;
-  const reviewPayload = payload as { reviewType?: string };
-  const mode = reviewPayload.reviewType;
+  const mode = (payload as { reviewType?: string }).reviewType;
   if (mode !== "new" && mode !== "mandatory" && mode !== "self") return;
   try {
     await fetch(`${API_BASE_URL}/study/today/progress`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode })
     });
-  } catch {
-    // Review itself is already persisted; progress can be reconciled on the next request.
-  }
+  } catch {}
 }
 
 async function afterAuthMe(user: unknown) {
@@ -56,7 +51,6 @@ async function afterAuthMe(user: unknown) {
       if (Number.isFinite(settings.dailyNewQuota)) localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
     }
   } catch {}
-
   try {
     const { restoreCloudStudyState } = await import("./studyRestore");
     await restoreCloudStudyState();
@@ -67,8 +61,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const requestInit = alignReviewIdentity(normalizedPath, init);
   const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
-    credentials: "include",
-    ...requestInit,
+    credentials: "include", ...requestInit,
     headers: { "Content-Type": "application/json", ...(requestInit?.headers || {}) },
   });
   if (!response.ok) {
@@ -78,8 +71,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const result = await response.json() as T;
   if (normalizedPath === "/auth/me") {
     const user = (result as { user?: unknown }).user;
-    if (user) void afterAuthMe(user);
+    if (user) await afterAuthMe(user);
   }
-  if (normalizedPath === "/reviews") void afterAuthenticatedReview(normalizedPath, requestInit?.body ? JSON.parse(String(requestInit.body)) : undefined);
+  if (normalizedPath === "/reviews" && requestInit?.body) {
+    try { void afterAuthenticatedReview(normalizedPath, JSON.parse(String(requestInit.body))); } catch {}
+  }
   return result;
 }
