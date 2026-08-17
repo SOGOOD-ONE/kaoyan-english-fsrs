@@ -6,15 +6,20 @@ export const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "/api").
 function ensureRandomUUID() {
   if (typeof globalThis.crypto === "undefined") return;
   if (typeof globalThis.crypto.randomUUID === "function") return;
+  const fallback = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
   const cryptoLike = globalThis.crypto as Crypto & { randomUUID?: () => string };
   try {
-    cryptoLike.randomUUID = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      const v = c === "x" ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    cryptoLike.randomUUID = fallback;
   } catch {
-    // The caller can still handle environments where Crypto is not extensible.
+    try {
+      Object.defineProperty(cryptoLike, "randomUUID", { configurable: true, value: fallback });
+    } catch {
+      // The caller can still handle environments where Crypto is not extensible.
+    }
   }
 }
 ensureRandomUUID();
