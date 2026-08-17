@@ -1,3 +1,4 @@
+import { uuid } from "../utils/uuid";
 import { Rating, preview, review, stateName, type Grade } from "../fsrs/adapter";
 import { getNewRecommendations, getMandatoryRecommendations, getSelfReviewRecommendations, type Recommendation } from "../services/recommend";
 import { downloadJson, exportData, importVocabularyFile } from "../services/importExport";
@@ -33,7 +34,7 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> { return api
 
 export async function mount(root: HTMLElement) {
   const words = await store.getWords();
-  if (!words.length) for (const word of VOCAB_DATA) await store.putWord({ ...word, id: word.id ?? `vocab-${crypto.randomUUID()}` });
+  if (!words.length) for (const word of VOCAB_DATA) await store.putWord({ ...word, id: word.id ?? `vocab-${uuid()}` });
   try { const result = await api<{ user: typeof me }>("/auth/me"); me = result.user; } catch { me = null; }
   if (me) await hydrateServerVocabulary();
   await loadVocabularyState();
@@ -118,7 +119,25 @@ async function submitRating(rating: Grade) {
     const localReview = await review(word, rating);
     if (me) {
       try {
-        await api(`/reviews`, { method: "POST", body: JSON.stringify({ wordId: word.id, rating, reviewType: mode, reviewId: localReview.reviewId, reviewedAt: localReview.reviewedAt }) });
+        await api(`/reviews`, {
+          method: "POST",
+          body: JSON.stringify({
+            wordId: word.id,
+            rating,
+            reviewType: mode,
+            reviewId: localReview.reviewId,
+            reviewedAt: localReview.reviewedAt,
+            card: {
+              state: localReview.card.state,
+              stability: localReview.card.stability,
+              difficulty: localReview.card.difficulty,
+              dueAt: localReview.card.due.toISOString(),
+              reviewCount: localReview.card.reps,
+              wrongCount: localReview.card.lapses,
+              correctCount: Math.max(0, localReview.card.reps - localReview.card.lapses)
+            }
+          })
+        });
         syncError = "";
       } catch {
         syncError = "本次学习已保存在本地，但云端同步失败。请稍后重新登录或检查网络。";
