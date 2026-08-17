@@ -51,10 +51,6 @@ async function afterAuthMe(user: unknown) {
       if (Number.isFinite(settings.dailyNewQuota)) localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
     }
   } catch {}
-  try {
-    const { restoreCloudStudyState } = await import("./studyRestore");
-    await restoreCloudStudyState();
-  } catch {}
 }
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
