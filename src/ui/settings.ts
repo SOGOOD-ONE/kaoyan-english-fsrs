@@ -12,6 +12,7 @@ export async function mountSettings(root: HTMLElement) {
   let settings: Settings;
   try {
     settings = await apiRequest<Settings>("/settings");
+    if ([80, 100, 150, 200].includes(settings.dailyNewQuota)) localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
   } catch {
     root.innerHTML = `<main class="settings-page"><section class="panel empty"><h2>暂时无法读取设置</h2><p>请登录后再试。</p><button id="back-home">返回首页</button></section></main>`;
     document.getElementById("back-home")?.addEventListener("click", () => { location.href = "/"; });
@@ -26,7 +27,9 @@ export async function mountSettings(root: HTMLElement) {
     const status = document.getElementById("save-status")!;
     status.textContent = "保存中…";
     try {
-      await apiRequest("/settings", { method: "PUT", body: JSON.stringify({ dailyNewQuota: Number((document.getElementById("daily-new-quota") as HTMLSelectElement).value), timezone: timezone.value, soundEnabled: (document.getElementById("sound-enabled") as HTMLInputElement).checked, autoPlayExample: (document.getElementById("auto-play-example") as HTMLInputElement).checked }) });
+      const dailyNewQuota = Number((document.getElementById("daily-new-quota") as HTMLSelectElement).value);
+      await apiRequest<Settings>("/settings", { method: "PUT", body: JSON.stringify({ dailyNewQuota, timezone: timezone.value, soundEnabled: (document.getElementById("sound-enabled") as HTMLInputElement).checked, autoPlayExample: (document.getElementById("auto-play-example") as HTMLInputElement).checked }) });
+      if ([80, 100, 150, 200].includes(dailyNewQuota)) localStorage.setItem("daily-new-quota", String(dailyNewQuota));
       status.textContent = "已保存";
       window.setTimeout(() => { status.textContent = ""; }, 1500);
     } catch {
