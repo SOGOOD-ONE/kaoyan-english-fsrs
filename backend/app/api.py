@@ -60,7 +60,7 @@ def register():
     if User.query.filter_by(email=email).first(): return jsonify({"error": "email_exists"}), 409
     user = User(email=email, password_hash=generate_password_hash(password), nickname=nickname); db.session.add(user); db.session.flush(); db.session.add(UserSetting(user_id=user.id))
     core = Vocabulary.query.filter_by(name="考研英语核心词", kind="system").first()
-    if core: db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=core.id, enabled=True, priority=core.priority)
+    if core: db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=core.id, enabled=True, priority=core.priority))
     db.session.commit(); session.clear(); session["user_id"] = user.id
     return jsonify({"user": user_json(user)}), 201
 
