@@ -6,7 +6,14 @@ export default defineConfig({
     {
       name: "auth-gate-inject",
       transformIndexHtml(html) {
-        return html.replace("</head>", '    <script src="/auth-gate.js"></script>\n</head>');
+        const withAuthGate = html.replace(
+          "</head>",
+          '    <script src="/auth-gate.js"></script>\n</head>'
+        );
+        return withAuthGate.replace(
+          "import * as TSFSRS from 'https://cdn.jsdelivr.net/npm/ts-fsrs@5.4.1/+esm';",
+          "import * as TSFSRS from '/src/fsrs-browser.ts';"
+        );
       }
     }
   ]
