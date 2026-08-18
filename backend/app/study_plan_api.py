@@ -40,6 +40,12 @@ def get_or_create_plan(user):
         )
         db.session.add(plan)
         db.session.commit()
+    elif plan.mandatory_completed == 0:
+        due_count = len(today_due_cards(user))
+        expected_total = min(due_count, review_quota)
+        if expected_total != plan.mandatory_total:
+            plan.mandatory_total = expected_total
+            db.session.commit()
     return plan
 
 
@@ -80,27 +86,11 @@ def study_overview(user):
         reviews_by_word[log.word_id] = reviews_by_word.get(log.word_id, 0) + 1
 
     card_by_word = {card.word_id: card for card in cards}
-    learned_ids = {
-        word_id
-        for word_id, count in reviews_by_word.items()
-        if count > 0
-    }
-    learned_ids.update(
-        card.word_id
-        for card in cards
-        if card.first_learned_at is not None
-    )
+    learned_ids = {word_id for word_id, count in reviews_by_word.items() if count > 0}
+    learned_ids.update(card.word_id for card in cards if card.first_learned_at is not None)
 
-    reviewed_ids = {
-        word_id
-        for word_id, count in reviews_by_word.items()
-        if count >= 2
-    }
-    reviewed_ids.update(
-        card.word_id
-        for card in cards
-        if card.review_count >= 2
-    )
+    reviewed_ids = {word_id for word_id, count in reviews_by_word.items() if count >= 2}
+    reviewed_ids.update(card.word_id for card in cards if card.review_count >= 2)
 
     mastered_ids = set()
     for word_id in reviewed_ids:
