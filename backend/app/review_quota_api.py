@@ -1,35 +1,13 @@
-from datetime import datetime
-
 from flask import Blueprint, jsonify, request
 
 from . import db
 from .api import login_required
-from .models import DailyPlan, UserSetting, UserVocabulary, UserWordCard, VocabularyWord
+from .models import DailyPlan, UserSetting
 from .time_utils import local_today
 
 review_quota_api = Blueprint("review_quota_api", __name__)
 
 ALLOWED = {50, 100, 150, 200, 250, 300}
-
-
-def refresh_unstarted_review_total(user, plan, quota):
-    if not plan or plan.mandatory_completed != 0:
-        return
-    vocabulary_ids = [row.vocabulary_id for row in UserVocabulary.query.filter_by(user_id=user.id, enabled=True).all()]
-    if not vocabulary_ids:
-        plan.mandatory_total = 0
-        return
-    word_ids = {row.word_id for row in VocabularyWord.query.filter(VocabularyWord.vocabulary_id.in_(vocabulary_ids)).all()}
-    if not word_ids:
-        plan.mandatory_total = 0
-        return
-    due_count = UserWordCard.query.filter(
-        UserWordCard.user_id == user.id,
-        UserWordCard.word_id.in_(word_ids),
-        UserWordCard.due_at <= datetime.utcnow(),
-        UserWordCard.state != "new",
-    ).count()
-    plan.mandatory_total = min(due_count, quota)
 
 
 @review_quota_api.get("/settings/review-quota")
@@ -59,7 +37,9 @@ def update_review_quota(user):
 
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=local_today(user)).first()
     if plan:
-        refresh_unstarted_review_total(user, plan, quota)
+        plan.self_total = quota
+        if plan.self_completed > plan.self_total:
+            plan.self_completed = plan.self_total
 
     db.session.commit()
     return jsonify({"dailyReviewQuota": quota})
