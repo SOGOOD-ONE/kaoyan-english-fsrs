@@ -1,6 +1,5 @@
 import os
-from flask import Flask
-from flask_cors import CORS
+from flask import Flask, CORS, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 
@@ -48,6 +47,12 @@ def _security_headers(response):
     return response
 
 
+def _api_error(error, status):
+    response = jsonify({"error": error, "status": status})
+    response.status_code = status
+    return response
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     secret_key = os.getenv("SECRET_KEY")
@@ -77,6 +82,18 @@ def create_app() -> Flask:
         raise RuntimeError("FRONTEND_ORIGIN must contain at least one allowed origin")
     CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
     app.after_request(_security_headers)
+
+    @app.errorhandler(413)
+    def request_too_large(error):
+        if request.path.startswith("/api/"):
+            return _api_error("request_too_large", 413)
+        return error
+
+    @app.errorhandler(404)
+    def not_found(error):
+        if request.path.startswith("/api/"):
+            return _api_error("not_found", 404)
+        return error
 
     from .api import api
     from .vocabulary_api import vocabulary_api
