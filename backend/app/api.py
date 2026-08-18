@@ -83,6 +83,24 @@ def selected_word_ids(user):
     return {row.word_id for row in VocabularyWord.query.filter(VocabularyWord.vocabulary_id.in_(vocabulary_ids)).all()}
 
 
+def apply_card_snapshot_monotonic(card, snapshot, reviewed_at):
+    """Apply a client card snapshot only when it is newer than the stored card."""
+    current_reviewed_at = card.last_review_at
+    if current_reviewed_at is not None and reviewed_at <= current_reviewed_at:
+        return False
+    try:
+        card.state = str(snapshot.get("state", card.state))
+        card.stability = float(snapshot.get("stability", card.stability or 0.0))
+        card.difficulty = float(snapshot.get("difficulty", card.difficulty or 5.0))
+        card.due_at = parse_client_datetime(snapshot.get("dueAt"), card.due_at)
+        card.review_count = int(snapshot.get("reviewCount", card.review_count or 0))
+        card.wrong_count = int(snapshot.get("wrongCount", card.wrong_count or 0))
+        card.correct_count = int(snapshot.get("correctCount", card.correct_count or 0))
+    except (TypeError, ValueError):
+        raise ValueError("invalid_card")
+    return True
+
+
 @api.get("/health")
 def health():
     return jsonify({"ok": True})
@@ -215,26 +233,25 @@ def submit_review_compat(user):
         db.session.add(card)
         db.session.flush()
 
-    snapshot = data.get("card") or {}
-    try:
-        card.state = str(snapshot.get("state", card.state))
-        card.stability = float(snapshot.get("stability", card.stability or 0.0))
-        card.difficulty = float(snapshot.get("difficulty", card.difficulty or 5.0))
-        card.due_at = parse_client_datetime(snapshot.get("dueAt"), card.due_at)
-        card.review_count = int(snapshot.get("reviewCount", card.review_count or 0))
-        card.wrong_count = int(snapshot.get("wrongCount", card.wrong_count or 0))
-        card.correct_count = int(snapshot.get("correctCount", card.correct_count or 0))
-    except (TypeError, ValueError):
-        return jsonify({"error": "invalid_card"}), 400
-
     reviewed_at = parse_client_datetime(data.get("reviewedAt"), datetime.utcnow())
     review_type = str(data.get("reviewType", "review"))
-    rating = int(data.get("rating", 3))
+    try:
+        rating = int(data.get("rating", 3))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_rating"}), 400
     if rating not in {1, 2, 3, 4}:
         return jsonify({"error": "invalid_rating"}), 400
 
-    card.last_review_at = reviewed_at
-    card.first_learned_at = card.first_learned_at or reviewed_at
+    snapshot = data.get("card") or {}
+    try:
+        apply_card_snapshot_monotonic(card, snapshot, reviewed_at)
+    except ValueError:
+        return jsonify({"error": "invalid_card"}), 400
+
+    if card.last_review_at is None or reviewed_at > card.last_review_at:
+        card.last_review_at = reviewed_at
+        card.first_learned_at = card.first_learned_at or reviewed_at
+
     row = ReviewLog(id=review_id, user_id=user.id, word_id=word_id, card_id=card.id,
                     rating=rating, review_type=review_type, reviewed_at=reviewed_at)
     db.session.add(row)
