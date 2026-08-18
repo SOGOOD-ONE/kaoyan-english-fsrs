@@ -7,8 +7,9 @@ type ServerCard = { id: string; wordId: string; state: string; stability: number
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[]; serverNow: string };
 type ServerReviewResult = { review: { id: string; reviewedAt: string }; card: ServerCard; duplicate?: boolean };
+type AuthMeResponse = { user: { id: string } | null };
 
-const SYNC_CURSOR_KEY = "kaoyan-english-fsrs:study-sync-cursor";
+const SYNC_CURSOR_PREFIX = "kaoyan-english-fsrs:study-sync-cursor:";
 
 function serverStateToLocal(state: string): Card["state"] {
   const normalized = String(state).toLowerCase();
@@ -41,12 +42,12 @@ function remoteReviewToStored(remote: ServerReview, card: ServerCard | undefined
   return { id: remote.id, wordId: remote.wordId, reviewedAt: new Date(remote.reviewedAt).getTime(), rating: remote.rating as Rating, log: {} as ReviewLog, card: snapshot, reviewType: remote.reviewType, syncedAt: Date.now() };
 }
 
-function getSyncCursor(): string | null {
-  try { return localStorage.getItem(SYNC_CURSOR_KEY); } catch { return null; }
+function getSyncCursor(userId: string): string | null {
+  try { return localStorage.getItem(`${SYNC_CURSOR_PREFIX}${userId}`); } catch { return null; }
 }
 
-function setSyncCursor(value: string) {
-  try { localStorage.setItem(SYNC_CURSOR_KEY, value); } catch { /* storage can be unavailable in private/restricted contexts */ }
+function setSyncCursor(userId: string, value: string) {
+  try { localStorage.setItem(`${SYNC_CURSOR_PREFIX}${userId}`, value); } catch { /* storage can be unavailable in private/restricted contexts */ }
 }
 
 export async function pushPendingReviews(): Promise<number> {
@@ -61,7 +62,10 @@ export async function pushPendingReviews(): Promise<number> {
 
 export async function syncStudyData(): Promise<{ cards: number; reviews: number; uploaded: number }> {
   const uploaded = await pushPendingReviews();
-  const cursor = getSyncCursor();
+  const me = await apiRequest<AuthMeResponse>("/auth/me");
+  if (!me.user?.id) throw new Error("unauthorized");
+  const userId = me.user.id;
+  const cursor = getSyncCursor(userId);
   const query = cursor ? `?since=${encodeURIComponent(cursor)}` : "";
   const server = await apiRequest<SyncResponse>(`/sync/study${query}`);
   const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
@@ -83,7 +87,7 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
     if (!local || remoteTime >= latestLocal) await store.putCard(serverCardToLocal(remote));
   }
 
-  setSyncCursor(server.serverNow);
+  setSyncCursor(userId, server.serverNow);
   return { cards: server.cards.length, reviews: server.reviews.length, uploaded };
 }
 
