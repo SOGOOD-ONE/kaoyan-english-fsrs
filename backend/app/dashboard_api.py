@@ -70,6 +70,31 @@ def count_active_days(user):
 def dashboard_summary(user):
     overview = build_overview(user)
     plan = get_or_create_plan(user)
+    settings = UserSetting.query.filter_by(user_id=user.id).first()
+    configured_new_quota = int(settings.daily_new_quota if settings else plan.new_quota)
+
+    selected_ids = selected_word_ids(user)
+    learned_ids = {
+        row.word_id
+        for row in UserWordCard.query.filter(
+            UserWordCard.user_id == user.id,
+            (UserWordCard.review_count > 0) | (UserWordCard.first_learned_at.isnot(None)),
+        ).all()
+    }
+    today = plan.plan_date
+    day_start = local_day_start_utc(user, today)
+    served_ids = {
+        row.word_id
+        for row in ReviewLog.query.filter(
+            ReviewLog.user_id == user.id,
+            ReviewLog.reviewed_at >= day_start,
+            ReviewLog.review_type == "new",
+        ).all()
+    }
+    available_new = len(selected_ids - learned_ids - served_ids)
+    new_completed = len(served_ids)
+    effective_new_quota = min(configured_new_quota, available_new + new_completed)
+
     now = datetime.utcnow()
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     start_of_day = local_day_start_utc(user, plan.plan_date)
@@ -96,8 +121,10 @@ def dashboard_summary(user):
             "mandatoryCompleted": mandatory_completed,
             "selfTotal": plan.self_total,
             "selfCompleted": plan.self_completed,
-            "newQuota": plan.new_quota,
-            "newCompleted": plan.new_completed,
+            "newQuota": effective_new_quota,
+            "configuredNewQuota": configured_new_quota,
+            "newCompleted": new_completed,
+            "availableNew": available_new,
             "reviewRemaining": review_remaining,
         },
         "activeDays": count_active_days(user),
