@@ -21,6 +21,7 @@ def ensure_schema_compatibility():
             "known_excluded": "ALTER TABLE user_word_cards ADD COLUMN known_excluded BOOLEAN NOT NULL DEFAULT 0",
             "new_ec_correct": "ALTER TABLE user_word_cards ADD COLUMN new_ec_correct INTEGER NOT NULL DEFAULT 0",
             "new_ce_correct": "ALTER TABLE user_word_cards ADD COLUMN new_ce_correct INTEGER NOT NULL DEFAULT 0",
+            "new_attempts": "ALTER TABLE user_word_cards ADD COLUMN new_attempts INTEGER NOT NULL DEFAULT 0",
             "new_complete": "ALTER TABLE user_word_cards ADD COLUMN new_complete BOOLEAN NOT NULL DEFAULT 0",
         }
         changed = False
@@ -28,6 +29,8 @@ def ensure_schema_compatibility():
             if name not in columns:
                 db.session.execute(text(statement))
                 changed = True
+        if "new_attempts" not in columns:
+            db.session.execute(text("UPDATE user_word_cards SET new_attempts = MIN(3, COALESCE(new_ec_correct, 0) + COALESCE(new_ce_correct, 0))"))
         if changed:
             db.session.commit()
     if "daily_plans" in tables:
