@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request
 
@@ -35,8 +35,8 @@ def sync_study_incremental(user):
 
     if since is None:
         # Paginated sync: limit per request
-    limit = min(int(request.args.get("limit", 500)), 2000)
-    cards = UserWordCard.query.filter_by(user_id=user.id).limit(limit).all()
+        limit = min(int(request.args.get("limit", 500)), 2000)
+        cards = UserWordCard.query.filter_by(user_id=user.id).limit(limit).all()
         logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
     else:
         logs = ReviewLog.query.filter(
