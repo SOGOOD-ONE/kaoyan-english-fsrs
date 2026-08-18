@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 
 from .api import login_required
 from .models import UserWordCard, Word
-from .study_plan_api import get_or_create_plan, mandatory_word_ids
+from .study_plan_api import get_or_create_plan, mandatory_word_ids, mandatory_completed_ids
 from .time_utils import local_today
 
 review_queue_api = Blueprint("review_queue_api", __name__)
@@ -30,21 +30,24 @@ def review_queue(user):
     today = local_today(user)
     plan = get_or_create_plan(user)
     source_ids, source_date = mandatory_word_ids(user, plan.mandatory_source_date)
-    remaining = max(0, len(source_ids) - plan.mandatory_completed)
-    if not source_ids or remaining == 0:
+    completed_ids = mandatory_completed_ids(user, source_ids)
+    pending_ids = source_ids - completed_ids
+    remaining = len(pending_ids)
+    completed = len(completed_ids)
+    if not pending_ids:
         return jsonify({
             "date": today.isoformat(),
             "sourceDate": source_date.isoformat(),
             "refreshHour": 6,
             "quota": None,
-            "completed": plan.mandatory_completed,
-            "remaining": remaining,
+            "completed": completed,
+            "remaining": 0,
             "words": [],
         })
 
     cards = UserWordCard.query.filter(
         UserWordCard.user_id == user.id,
-        UserWordCard.word_id.in_(source_ids),
+        UserWordCard.word_id.in_(pending_ids),
         UserWordCard.known_excluded.is_(False),
     ).order_by(UserWordCard.last_review_at.asc(), UserWordCard.id.asc()).all()
     by_id = {word.id: word for word in Word.query.filter(Word.id.in_([c.word_id for c in cards])).all()} if cards else {}
@@ -65,7 +68,7 @@ def review_queue(user):
         "sourceDate": source_date.isoformat(),
         "refreshHour": 6,
         "quota": None,
-        "completed": plan.mandatory_completed,
+        "completed": completed,
         "remaining": remaining,
         "words": words,
     })
