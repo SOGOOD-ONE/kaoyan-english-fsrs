@@ -1,3 +1,4 @@
+import "./history.css";
 import { getStudyHistory } from "../services/history";
 import { renderNav } from "./nav";
 
