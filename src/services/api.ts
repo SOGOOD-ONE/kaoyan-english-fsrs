@@ -104,6 +104,30 @@ function sleep(ms: number) {
   return new Promise<void>(resolve => window.setTimeout(resolve, ms));
 }
 
+function markCorrectNewOption(correctAnswer: string) {
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-action="new-answer"]'));
+  const button = buttons.find(item => {
+    try { return decodeURIComponent(item.dataset.option || "") === correctAnswer; } catch { return item.dataset.option === correctAnswer; }
+  });
+  if (!button) return;
+  button.style.borderColor = "#16a34a";
+  button.style.background = "rgba(34, 197, 94, 0.10)";
+  button.style.color = "#166534";
+  button.style.boxShadow = "0 0 0 2px rgba(34, 197, 94, 0.12) inset";
+}
+
+async function speakCorrectNewAnswer(answer: string) {
+  if (!answer.trim() || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(answer);
+    utterance.lang = "en-US";
+    utterance.rate = 0.75;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  } catch {}
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const requestInit = alignReviewIdentity(normalizedPath, init);
@@ -126,6 +150,17 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(String(body.error || `API ${response.status}`));
   }
   const result = await response.json() as T;
+
+  if (normalizedPath === "/study/new-answer") {
+    const feedback = result as { correct?: boolean; correctAnswer?: string; direction?: string };
+    if (feedback.correct === false && feedback.correctAnswer) {
+      markCorrectNewOption(feedback.correctAnswer);
+      if (feedback.direction === "ce") await speakCorrectNewAnswer(feedback.correctAnswer);
+      await speechCompletion.catch(() => undefined);
+      await sleep(1200);
+    }
+  }
+
   if (selectionPath(normalizedPath)) {
     if (speechPending) {
       await speechCompletion.catch(() => undefined);
