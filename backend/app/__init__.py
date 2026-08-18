@@ -65,6 +65,7 @@ def create_app() -> Flask:
         SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///kaoyan.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        MAX_CONTENT_LENGTH=10 * 1024 * 1024,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="None" if cookie_samesite_none else "Lax",
         SESSION_COOKIE_SECURE=cookie_secure,
