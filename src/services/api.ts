@@ -33,18 +33,6 @@ function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | un
   } catch { return init; }
 }
 
-async function afterAuthenticatedReview(path: string, payload: unknown) {
-  if (path !== "/reviews" || !payload || typeof payload !== "object") return;
-  const mode = (payload as { reviewType?: string }).reviewType;
-  if (mode !== "new" && mode !== "mandatory" && mode !== "self") return;
-  try {
-    await fetch(`${API_BASE_URL}/study/today/progress`, {
-      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode })
-    });
-  } catch {}
-}
-
 async function afterAuthMe(user: unknown) {
   if (!user || typeof user !== "object") {
     setStoreUser(null);
@@ -80,8 +68,5 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     await afterAuthMe(user);
   }
   if (normalizedPath === "/auth/logout") setStoreUser(null);
-  if (normalizedPath === "/reviews" && requestInit?.body) {
-    try { void afterAuthenticatedReview(normalizedPath, JSON.parse(String(requestInit.body))); } catch {}
-  }
   return result;
 }
