@@ -19,6 +19,16 @@ ensureRandomUUID();
 type ReviewIdentity = { id: string; wordId: string; reviewedAt: number };
 type AuthUser = { id?: string | number; [key: string]: unknown };
 
+let cachedAuthUser: unknown | undefined;
+let authCacheReady = false;
+let settingsQuotaCache: number | undefined;
+
+export function clearApiCaches() {
+  cachedAuthUser = undefined;
+  authCacheReady = false;
+  settingsQuotaCache = undefined;
+}
+
 function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | undefined {
   if (!init?.body || path !== "/reviews" || typeof init.body !== "string") return init;
   try {
@@ -34,8 +44,11 @@ function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | un
 }
 
 async function afterAuthMe(user: unknown) {
+  cachedAuthUser = user;
+  authCacheReady = true;
   if (!user || typeof user !== "object") {
     setStoreUser(null);
+    settingsQuotaCache = undefined;
     return;
   }
   const authUser = user as AuthUser;
@@ -43,10 +56,15 @@ async function afterAuthMe(user: unknown) {
   else setStoreUser(null);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/settings`, { credentials: "include" });
-    if (response.ok) {
-      const settings = await response.json() as { dailyNewQuota?: number };
-      if (Number.isFinite(settings.dailyNewQuota)) localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
+    if (settingsQuotaCache === undefined) {
+      const response = await fetch(`${API_BASE_URL}/settings`, { credentials: "include" });
+      if (response.ok) {
+        const settings = await response.json() as { dailyNewQuota?: number };
+        if (Number.isFinite(settings.dailyNewQuota)) {
+          settingsQuotaCache = settings.dailyNewQuota;
+          localStorage.setItem("daily-new-quota", String(settings.dailyNewQuota));
+        }
+      }
     }
   } catch {}
 }
@@ -54,12 +72,22 @@ async function afterAuthMe(user: unknown) {
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const requestInit = alignReviewIdentity(normalizedPath, init);
+
+  if (normalizedPath === "/auth/me" && authCacheReady && !requestInit?.method) {
+    return { user: cachedAuthUser } as T;
+  }
+
   const response = await fetch(`${API_BASE_URL}${normalizedPath}`, {
     credentials: "include", ...requestInit,
     headers: { "Content-Type": "application/json", ...(requestInit?.headers || {}) },
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({} as Record<string, unknown>));
+    if (normalizedPath === "/auth/me") {
+      authCacheReady = true;
+      cachedAuthUser = null;
+      setStoreUser(null);
+    }
     throw new Error(String(body.error || `API ${response.status}`));
   }
   const result = await response.json() as T;
@@ -67,6 +95,9 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     const user = (result as { user?: unknown }).user;
     await afterAuthMe(user);
   }
-  if (normalizedPath === "/auth/logout") setStoreUser(null);
+  if (normalizedPath === "/auth/logout") {
+    clearApiCaches();
+    setStoreUser(null);
+  }
   return result;
 }
