@@ -17,13 +17,15 @@ def word_json(word):
 
 
 def card_json(card):
+    attempts = int(card.new_attempts or 0)
     return {
         "id": card.id,
         "wordId": card.word_id,
         "newEcCorrect": card.new_ec_correct,
         "newCeCorrect": card.new_ce_correct,
+        "newAttempts": attempts,
         "knownExcluded": bool(card.known_excluded),
-        "newComplete": card.new_ec_correct >= 2 and card.new_ce_correct >= 1,
+        "newComplete": bool(card.new_complete) or attempts >= 3,
     }
 
 
@@ -43,7 +45,7 @@ def study_new_queue(user):
     completed = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= day_start, ReviewLog.review_type == "new").with_entities(ReviewLog.word_id).distinct().count()
     selected_ids = selected_word_ids(user)
     cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(selected_ids)).all() if selected_ids else []
-    learned_ids = {c.word_id for c in cards if not c.known_excluded and c.review_count > 0}
+    learned_ids = {c.word_id for c in cards if not c.known_excluded and (c.review_count > 0 or c.new_complete or (c.new_attempts or 0) >= 3)}
     known_ids = {c.word_id for c in cards if c.known_excluded}
     completed_ids = {row[0] for row in ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= day_start, ReviewLog.review_type == "new").with_entities(ReviewLog.word_id).distinct().all()}
     candidate_ids = selected_ids - learned_ids - known_ids - completed_ids
@@ -59,7 +61,7 @@ def study_new_queue(user):
     card_map = {c.word_id: c for c in cards}
     words = []
     for word in candidates[:remaining]:
-        words.append({**word_json(word), "card": card_json(card_map[word.id]) if word.id in card_map else {"newEcCorrect": 0, "newCeCorrect": 0, "knownExcluded": False, "newComplete": False}})
+        words.append({**word_json(word), "card": card_json(card_map[word.id]) if word.id in card_map else {"newEcCorrect": 0, "newCeCorrect": 0, "newAttempts": 0, "knownExcluded": False, "newComplete": False}})
     return jsonify({"date": today.isoformat(), "newUnlocked": True, "mandatoryRemaining": 0, "quota": settings.daily_new_quota, "effectiveQuota": effective_quota, "available": available, "completed": completed, "words": words})
 
 
@@ -84,19 +86,25 @@ def answer_new_word(user):
         db.session.flush()
     if card.known_excluded:
         return jsonify({"error": "word_excluded"}), 409
-    expected_direction = "ce" if card.new_ec_correct >= 2 else "ec"
+    attempts = int(card.new_attempts or 0)
+    if attempts >= 3 or card.new_complete:
+        return jsonify({"error": "new_learning_complete", "card": card_json(card)}), 409
+    expected_direction = "ce" if attempts >= 2 else "ec"
     if direction != expected_direction:
         return jsonify({"error": "wrong_learning_stage", "expectedDirection": expected_direction, "card": card_json(card)}), 409
+
+    card.new_attempts = attempts + 1
     if correct:
         if direction == "ec":
             card.new_ec_correct = min(2, card.new_ec_correct + 1)
         else:
             card.new_ce_correct = min(1, card.new_ce_correct + 1)
-    completed = card.new_ec_correct >= 2 and card.new_ce_correct >= 1
+    completed = card.new_attempts >= 3
     if completed:
+        card.new_complete = True
         card.first_learned_at = card.first_learned_at or datetime.utcnow()
     db.session.commit()
-    return jsonify({"ok": True, "correct": correct, "expectedDirection": "ce" if card.new_ec_correct >= 2 else "ec", "completed": completed, "card": card_json(card)})
+    return jsonify({"ok": True, "correct": correct, "expectedDirection": "ce" if card.new_attempts >= 2 else "ec", "completed": completed, "card": card_json(card)})
 
 
 @study_new_api.post("/study/known-exclude")
@@ -118,6 +126,8 @@ def mark_known_excluded(user):
     card.known_excluded = True
     card.new_ec_correct = 0
     card.new_ce_correct = 0
+    card.new_attempts = 0
+    card.new_complete = False
     today = local_today(user)
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
     if plan:
