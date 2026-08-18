@@ -2,9 +2,20 @@ import os
 from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import inspect, text
 
 
 db = SQLAlchemy()
+
+
+def ensure_schema_compatibility():
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+    if "user_settings" in tables:
+        columns = {column["name"] for column in inspector.get_columns("user_settings")}
+        if "daily_review_quota" not in columns:
+            db.session.execute(text("ALTER TABLE user_settings ADD COLUMN daily_review_quota INTEGER NOT NULL DEFAULT 100"))
+            db.session.commit()
 
 
 def create_app() -> Flask:
@@ -34,5 +45,6 @@ def create_app() -> Flask:
     with app.app_context():
         from . import models  # noqa: F401
         db.create_all()
+        ensure_schema_compatibility()
 
     return app
