@@ -156,30 +156,34 @@ export async function mountNewStudy(root: HTMLElement) {
       try {
         if (direction === "ce") speakEnglish(selected);
         if (direction === "ec" && correct) speakEnglish(selectedWord.word);
-        const result = await apiRequest<{ completed: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: selectedWord.id, direction, correct }) });
+        const result = await apiRequest<{ completed: boolean; ignored?: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: selectedWord.id, direction, correct }) });
         selectedWord.card = result.card;
         step += 1;
 
-        if (!correct) {
-          feedback = { selected, correct: correctAnswer };
-          rerender();
-          if (direction === "ce") speakEnglish(correctAnswer);
-          await wait(1200);
-          feedback = undefined;
-        }
-
-        if (result.completed) {
-          const fsrsResult = await review(selectedWord, Rating.Good as Grade);
-          const reviewRows = await store.getReviews(selectedWord.id);
-          const saved = reviewRows.find(row => row.id === fsrsResult.reviewId);
-          if (!saved) throw new Error("学习记录保存失败，请重试");
-          saved.reviewType = "new";
-          await submitReviewToServer(saved);
-          await store.markReviewSynced(saved.id);
+        if (result.ignored) {
           completed += 1;
           selectedWord.card.newComplete = true;
         } else {
-          scheduled.push({ word: selectedWord, dueStep: step + randomGap() });
+          if (!correct) {
+            feedback = { selected, correct: correctAnswer };
+            rerender();
+            if (direction === "ce") speakEnglish(correctAnswer);
+            await wait(1200);
+            feedback = undefined;
+          }
+          if (result.completed) {
+            const fsrsResult = await review(selectedWord, Rating.Good as Grade);
+            const reviewRows = await store.getReviews(selectedWord.id);
+            const saved = reviewRows.find(row => row.id === fsrsResult.reviewId);
+            if (!saved) throw new Error("学习记录保存失败，请重试");
+            saved.reviewType = "new";
+            await submitReviewToServer(saved);
+            await store.markReviewSynced(saved.id);
+            completed += 1;
+            selectedWord.card.newComplete = true;
+          } else {
+            scheduled.push({ word: selectedWord, dueStep: step + randomGap() });
+          }
         }
 
         lastId = selectedWord.id;

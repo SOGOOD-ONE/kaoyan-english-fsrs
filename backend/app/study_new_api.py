@@ -79,26 +79,23 @@ def answer_new_word(user):
     word = Word.query.filter_by(id=word_id).first()
     if not word:
         return jsonify({"error": "word_not_found"}), 404
-    if word_id not in selected_word_ids(user):
-        return jsonify({"error": "word_not_in_selected_vocabulary"}), 409
     card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
+    if not card and word_id not in selected_word_ids(user):
+        return jsonify({"error": "word_not_in_selected_vocabulary"}), 409
     if not card:
         card = UserWordCard(user_id=user.id, word_id=word_id, state="new", due_at=datetime.utcnow())
         db.session.add(card)
         db.session.flush()
     if card.known_excluded:
-        return jsonify({"error": "word_excluded"}), 409
+        return jsonify({"ok": True, "ignored": True, "completed": False, "card": card_json(card)})
+    if card.new_complete or (int(card.new_ec_correct or 0) >= 2 and int(card.new_ce_correct or 0) >= 1):
+        if not card.new_complete:
+            card.new_complete = True
+            db.session.commit()
+        return jsonify({"ok": True, "ignored": True, "completed": False, "card": card_json(card)})
 
     ec_correct = int(card.new_ec_correct or 0)
     ce_correct = int(card.new_ce_correct or 0)
-    
-    if card.new_complete or (ec_correct >= 2 and ce_correct >= 1):
-        card.new_complete = True
-        db.session.commit()
-        return jsonify({
-            "ok": True,
-            "completed": True,
-            "card": card_json(card)})
 
     expected_direction = "ce" if ec_correct >= 2 else "ec"
     if direction != expected_direction:

@@ -181,11 +181,15 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           try {
             if (direction === "ce") speakEnglish(selected);
             if (direction === "ec" && correct) speakEnglish(answered.word);
-            const result = await apiRequest<{ completed: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: answered.id, direction, correct }) });
+            const result = await apiRequest<{ completed: boolean; ignored?: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: answered.id, direction, correct }) });
             answered.card = result.card;
 
             turn += 1;
-            if (result.completed) {
+            if (result.ignored) {
+              completedWords += 1;
+              answered.card.newComplete = true;
+              pending.delete(answered.id);
+            } else if (result.completed) {
               const fsrsResult = await review(answered, Rating.Good as Grade);
               const reviewRows = await store.getReviews(answered.id);
               const saved = reviewRows.find(row => row.id === fsrsResult.reviewId);
