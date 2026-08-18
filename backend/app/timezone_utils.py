@@ -1,13 +1,15 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
+
+from .models import UserSetting
 
 DEFAULT_TIMEZONE = "Asia/Shanghai"
 
 
 def user_timezone(user):
-    value = getattr(getattr(user, "setting", None), "timezone", None)
+    settings = UserSetting.query.filter_by(user_id=user.id).first()
     try:
-        return ZoneInfo(value or DEFAULT_TIMEZONE)
+        return ZoneInfo(settings.timezone if settings and settings.timezone else DEFAULT_TIMEZONE)
     except Exception:
         return ZoneInfo(DEFAULT_TIMEZONE)
 
