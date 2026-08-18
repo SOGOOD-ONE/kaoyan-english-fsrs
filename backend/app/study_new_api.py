@@ -31,7 +31,7 @@ def study_new_queue(user):
         ReviewLog.review_type == "new",
     ).all()
     served_ids = {row.word_id for row in new_logs}
-    completed = len({row.word_id for row in new_logs})
+    completed = len(served_ids)
     remaining = max(0, int(settings.daily_new_quota) - completed)
     if remaining == 0:
         return jsonify({"date": today.isoformat(), "newUnlocked": True, "mandatoryRemaining": 0, "quota": settings.daily_new_quota, "completed": completed, "words": []})
