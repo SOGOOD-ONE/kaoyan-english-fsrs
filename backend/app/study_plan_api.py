@@ -1,11 +1,10 @@
 from datetime import date, datetime
-import math
 
 from flask import Blueprint, jsonify, request
 
 from . import db
 from .api import login_required, selected_word_ids
-from .models import DailyPlan, StudySession, UserWordCard, UserSetting
+from .models import DailyPlan, StudySession, UserSetting, UserWordCard, ReviewLog
 
 study_plan_api = Blueprint("study_plan_api", __name__)
 
@@ -23,7 +22,6 @@ def get_or_create_plan(user):
 
 
 def card_retrievability(card, now=None):
-    """Approximate the current FSRS retrievability from the stored card state."""
     if card.state != "review" or not card.last_review_at or card.stability <= 0:
         return 0.0
     now = now or datetime.utcnow()
@@ -36,36 +34,13 @@ def card_retrievability(card, now=None):
 def study_overview(user):
     word_ids = selected_word_ids(user)
     total = len(word_ids)
-    cards = UserWordCard.query.filter(
-        UserWordCard.user_id == user.id,
-        UserWordCard.word_id.in_(word_ids),
-    ).all() if word_ids else []
-
+    cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all() if word_ids else []
     learned_ids = {card.word_id for card in cards if card.first_learned_at is not None or card.review_count > 0}
     reviewed_ids = {card.word_id for card in cards if card.review_count > 1}
-    mastered_ids = {
-        card.word_id
-        for card in cards
-        if card.state == "review"
-        and card.stability >= 1.5
-        and card_retrievability(card) >= 0.9
-        and card.review_count >= 2
-    }
-
-    learned = len(learned_ids)
-    reviewed = len(reviewed_ids)
-    mastered = len(mastered_ids)
+    mastered_ids = {card.word_id for card in cards if card.state == "review" and card.stability >= 1.5 and card_retrievability(card) >= 0.9 and card.review_count >= 2}
+    learned, reviewed, mastered = len(learned_ids), len(reviewed_ids), len(mastered_ids)
     remaining = max(0, total - learned)
-    progress = round((learned / total) * 100, 1) if total else 0.0
-
-    return jsonify({
-        "totalWords": total,
-        "learnedWords": learned,
-        "reviewedWords": reviewed,
-        "masteredWords": mastered,
-        "remainingWords": remaining,
-        "progressPercent": progress,
-    })
+    return jsonify({"totalWords": total, "learnedWords": learned, "reviewedWords": reviewed, "masteredWords": mastered, "remainingWords": remaining, "progressPercent": round((learned / total) * 100, 1) if total else 0.0})
 
 
 @study_plan_api.get("/study/today/progress")
@@ -73,16 +48,7 @@ def study_overview(user):
 def get_today_progress(user):
     plan = get_or_create_plan(user)
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    return jsonify({
-        "date": plan.plan_date.isoformat(),
-        "newQuota": plan.new_quota,
-        "newCompleted": plan.new_completed,
-        "mandatoryTotal": plan.mandatory_total,
-        "mandatoryCompleted": plan.mandatory_completed,
-        "selfTotal": plan.self_total,
-        "selfCompleted": plan.self_completed,
-        "activeSessionId": active.id if active else None,
-    })
+    return jsonify({"date": plan.plan_date.isoformat(), "newQuota": plan.new_quota, "newCompleted": plan.new_completed, "mandatoryTotal": plan.mandatory_total, "mandatoryCompleted": plan.mandatory_completed, "selfTotal": plan.self_total, "selfCompleted": plan.self_completed, "activeSessionId": active.id if active else None})
 
 
 @study_plan_api.post("/study/today/progress")
@@ -90,13 +56,10 @@ def get_today_progress(user):
 def record_today_progress(user):
     data = request.get_json(silent=True) or {}
     mode = str(data.get("mode", "new"))
-    if mode not in {"new", "mandatory", "self"}:
-        return jsonify({"error": "invalid_mode"}), 400
-
+    if mode not in {"new", "mandatory", "self"}: return jsonify({"error": "invalid_mode"}), 400
     plan = get_or_create_plan(user)
     field = {"new": "new_completed", "mandatory": "mandatory_completed", "self": "self_completed"}[mode]
-    current = int(getattr(plan, field) or 0)
-    setattr(plan, field, current + 1)
+    setattr(plan, field, int(getattr(plan, field) or 0) + 1)
     db.session.commit()
     return jsonify({"ok": True, "mode": mode, "completed": getattr(plan, field)})
 
@@ -106,16 +69,11 @@ def record_today_progress(user):
 def start_study_session(user):
     data = request.get_json(silent=True) or {}
     mode = str(data.get("mode", "new"))
-    if mode not in {"new", "mandatory", "self"}:
-        return jsonify({"error": "invalid_mode"}), 400
-
+    if mode not in {"new", "mandatory", "self"}: return jsonify({"error": "invalid_mode"}), 400
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    if active:
-        return jsonify({"sessionId": active.id, "startedAt": active.started_at.isoformat(), "mode": active.mode})
-
+    if active: return jsonify({"sessionId": active.id, "startedAt": active.started_at.isoformat(), "mode": active.mode})
     session = StudySession(user_id=user.id, mode=mode, started_at=datetime.utcnow())
-    db.session.add(session)
-    db.session.commit()
+    db.session.add(session); db.session.commit()
     return jsonify({"sessionId": session.id, "startedAt": session.started_at.isoformat(), "mode": session.mode})
 
 
@@ -123,41 +81,31 @@ def start_study_session(user):
 @login_required
 def stop_study_session(user, session_id):
     session = StudySession.query.filter_by(id=session_id, user_id=user.id).first()
-    if not session:
-        return jsonify({"error": "session_not_found"}), 404
+    if not session: return jsonify({"error": "session_not_found"}), 404
     if session.ended_at is None:
-        ended_at = datetime.utcnow()
-        session.ended_at = ended_at
-        session.duration_seconds = max(0, int((ended_at - session.started_at).total_seconds()))
-        db.session.commit()
-    return jsonify({
-        "sessionId": session.id,
-        "durationSeconds": session.duration_seconds,
-        "startedAt": session.started_at.isoformat(),
-        "endedAt": session.ended_at.isoformat() if session.ended_at else None,
-        "mode": session.mode,
-    })
+        ended_at = datetime.utcnow(); session.ended_at = ended_at; session.duration_seconds = max(0, int((ended_at - session.started_at).total_seconds())); db.session.commit()
+    return jsonify({"sessionId": session.id, "durationSeconds": session.duration_seconds, "startedAt": session.started_at.isoformat(), "endedAt": session.ended_at.isoformat() if session.ended_at else None, "mode": session.mode})
 
 
 @study_plan_api.get("/study/time")
 @login_required
 def study_time(user):
-    today = date.today()
-    start = datetime.combine(today, datetime.min.time())
-    sessions = StudySession.query.filter(
-        StudySession.user_id == user.id,
-        StudySession.started_at >= start,
-        StudySession.ended_at.isnot(None),
-    ).all()
+    today = date.today(); start = datetime.combine(today, datetime.min.time())
+    sessions = StudySession.query.filter(StudySession.user_id == user.id, StudySession.started_at >= start, StudySession.ended_at.isnot(None)).all()
     today_seconds = sum(int(row.duration_seconds or 0) for row in sessions)
     total_seconds = sum(int(value or 0) for value in db.session.query(db.func.sum(StudySession.duration_seconds)).filter(StudySession.user_id == user.id).all())
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     if active:
-        elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds()))
-        today_seconds += elapsed
-        total_seconds += elapsed
-    return jsonify({
-        "todaySeconds": today_seconds,
-        "totalSeconds": total_seconds,
-        "activeSessionId": active.id if active else None,
-    })
+        elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds())); today_seconds += elapsed; total_seconds += elapsed
+    return jsonify({"todaySeconds": today_seconds, "totalSeconds": total_seconds, "activeSessionId": active.id if active else None})
+
+
+@study_plan_api.post("/study/reset")
+@login_required
+def reset_study_progress(user):
+    ReviewLog.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    UserWordCard.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    DailyPlan.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    StudySession.query.filter_by(user_id=user.id).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({"ok": True})
