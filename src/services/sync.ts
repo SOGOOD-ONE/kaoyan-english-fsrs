@@ -67,7 +67,7 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
   const userId = me.user.id;
   const cursor = getSyncCursor(userId);
   const query = cursor ? `?since=${encodeURIComponent(cursor)}` : "";
-  const server = await apiRequest<SyncResponse>(`/sync/study${query}`);
+  const server = await apiRequest<SyncResponse>(`/sync/study-incremental${query}`);
   const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
