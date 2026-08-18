@@ -5,28 +5,39 @@ import type { Grade } from "../fsrs/adapter";
 import { store } from "../db/db";
 import { syncStudyData, uploadReview } from "../services/sync";
 
-type Mode = "new" | "self";
+type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
-type Today = { review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number };
+type Today = { review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number; mandatoryCompleted: number; mandatoryTotal: number };
+type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
 type Item = { word: ServerWord; card?: Today["review"][number] };
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]!));
 }
 
-async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number; done: number }> {
+async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
   await syncStudyData().catch(() => undefined);
   const today = await apiRequest<Today>("/study/today");
   const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
   const byId = new Map(words.map(word => [word.id, word]));
-  if (mode === "new") return { items: today.newWords.map(word => ({ word })), total: today.newTotal, done: today.newCompleted };
+  if (mode === "new") {
+    return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
+  }
   const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
-  return { items, total: today.reviewTotal, done: today.reviewCompleted };
+  return { items, total: today.reviewTotal };
 }
 
 export async function mountStudy(root: HTMLElement, mode: Mode) {
   root.innerHTML = `<div class="study-page"><div class="study-loading">正在加载学习内容…</div></div>`;
   try {
+    const progress = await apiRequest<TodayProgress>("/study/today/progress");
+    const reviewRemaining = Math.max(0, progress.reviewRemaining ?? (progress.mandatoryTotal - progress.mandatoryCompleted));
+
+    if (mode === "new" && reviewRemaining > 0) {
+      root.innerHTML = `<main class="study-page"><section class="study-complete"><div class="study-complete-kicker">今日学习顺序</div><h2>请先完成今日复习</h2><p>还有 ${reviewRemaining} 项必做复习未完成。完成后才能开始学习新词。</p><a href="/study/review" class="study-home-btn">开始复习</a></section></main>`;
+      return;
+    }
+
     const { items, total } = await loadItems(mode);
     let index = 0;
     let answerVisible = false;
@@ -35,7 +46,9 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
     const render = () => {
       const item = items[index];
       const percent = total ? Math.min(100, Math.round((index / total) * 100)) : 100;
-      root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${mode === "new" ? "学习新词" : "自主复习"}</h1><p>${mode === "new" ? "完成今天的新词学习" : "复习当前已经到期的单词"}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2>${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button>${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${mode === "new" ? "新词学习完成" : "复习完成"}</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 ${Math.min(index, total)} 个 · 本次进度会同步到你的账号</div></main>`;
+      const title = mode === "new" ? "学习新词" : mode === "mandatory" ? "今日复习" : "自主复习";
+      const desc = mode === "new" ? "完成今天的新词学习" : mode === "mandatory" ? "完成今天必须完成的复习" : "复习当前已经到期的单词";
+      root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2>${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button>${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 ${Math.min(index, total)} 个 · 本次进度会同步到你的账号</div></main>`;
 
       document.getElementById("study-reveal")?.addEventListener("click", () => { answerVisible = !answerVisible; render(); });
       root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
