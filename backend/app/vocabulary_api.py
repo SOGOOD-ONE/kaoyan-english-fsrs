@@ -87,6 +87,9 @@ def import_user_vocabulary(user):
     name = str(data.get("name", "")).strip() or "我的词库"
     words = data.get("words", [])
     if not isinstance(words, list) or len(words) == 0: return jsonify({"error": "words_required"}), 400
+    MAX_WORDS_PER_IMPORT = 5000
+    if len(words) > MAX_WORDS_PER_IMPORT:
+        return jsonify({"error": "words_too_many", "max": MAX_WORDS_PER_IMPORT}), 400
 
     vocabulary = Vocabulary.query.filter_by(owner_user_id=user.id, kind="user", name=name).first()
     created_vocabulary = False
