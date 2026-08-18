@@ -18,6 +18,16 @@ function reviveCard(card: Card): Card {
   return c;
 }
 
+function sanitizeCard(card: Card): Card {
+  if (card.state !== State.New && (card.stability <= 0 || card.difficulty < 1)) {
+    return createEmptyCard(card.due);
+  }
+  if (card.state === State.New && (card.stability <= 0 || card.difficulty <= 0)) {
+    return createEmptyCard(card.due);
+  }
+  return card;
+}
+
 function rememberReviewIdentity(review: StoredReview) {
   try {
     const key = "fsrs-review-identities";
@@ -32,7 +42,12 @@ function rememberReviewIdentity(review: StoredReview) {
 
 export async function getCard(wordId: string): Promise<Card> {
   const saved = await store.getCard(wordId);
-  if (saved) return reviveCard(saved.card);
+  if (saved) {
+    const revived = reviveCard(saved.card);
+    const card = sanitizeCard(revived);
+    if (card !== revived) await store.putCard({ wordId, card });
+    return card;
+  }
   const card = createEmptyCard();
   await store.putCard({ wordId, card });
   return card;

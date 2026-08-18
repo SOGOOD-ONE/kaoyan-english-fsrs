@@ -1,4 +1,4 @@
-import { State, type Card, type Rating, type ReviewLog } from "ts-fsrs";
+import { State, createEmptyCard, type Card, type Rating, type ReviewLog } from "ts-fsrs";
 import { store } from "../db/db";
 import type { StoredCard, StoredReview } from "../types";
 import { apiRequest } from "./api";
@@ -27,11 +27,19 @@ function localStateToServer(state: Card["state"]): string {
 }
 
 function serverCardToLocal(card: ServerCard): StoredCard {
+  const state = serverStateToLocal(card.state);
+  const due = new Date(card.dueAt);
+  if (state === State.New) {
+    return { wordId: card.wordId, card: createEmptyCard(due) };
+  }
+  if (card.stability <= 0 || card.difficulty < 1) {
+    return { wordId: card.wordId, card: createEmptyCard(due) };
+  }
   return {
     wordId: card.wordId,
     card: {
-      due: new Date(card.dueAt), stability: card.stability, difficulty: card.difficulty,
-      state: serverStateToLocal(card.state), last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined,
+      due, stability: card.stability, difficulty: card.difficulty,
+      state, last_review: card.lastReviewAt ? new Date(card.lastReviewAt) : undefined,
       reps: card.reviewCount, lapses: card.wrongCount, learning_steps: 0,
     } as Card,
   };
