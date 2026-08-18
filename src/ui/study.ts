@@ -7,7 +7,19 @@ import { syncStudyData, uploadReview } from "../services/sync";
 
 type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
-type Today = { review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number; mandatoryCompleted: number; mandatoryTotal: number };
+type Today = {
+  review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[];
+  newWords: ServerWord[];
+  newTotal: number;
+  newCompleted: number;
+  reviewTotal: number;
+  reviewCompleted: number;
+  mandatoryCompleted: number;
+  mandatoryTotal: number;
+  mandatoryRemaining: number;
+  newUnlocked: boolean;
+};
+
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
 type Item = { word: ServerWord; card?: Today["review"][number] };
 
@@ -18,11 +30,12 @@ function escapeHtml(value: string) {
 async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
   await syncStudyData().catch(() => undefined);
   const today = await apiRequest<Today>("/study/today");
+  if (mode === "new" && !today.newUnlocked) {
+    throw new Error(`今天还有 ${today.mandatoryRemaining} 项必做复习，请先完成复习。`);
+  }
   const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
   const byId = new Map(words.map(word => [word.id, word]));
-  if (mode === "new") {
-    return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
-  }
+  if (mode === "new") return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
   const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
   return { items, total: today.reviewTotal };
 }
@@ -32,7 +45,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
   try {
     const progress = await apiRequest<TodayProgress>("/study/today/progress");
     const reviewRemaining = Math.max(0, progress.reviewRemaining ?? (progress.mandatoryTotal - progress.mandatoryCompleted));
-
     if (mode === "new" && reviewRemaining > 0) {
       root.innerHTML = `<main class="study-page"><section class="study-complete"><div class="study-complete-kicker">今日学习顺序</div><h2>请先完成今日复习</h2><p>还有 ${reviewRemaining} 项必做复习未完成。完成后才能开始学习新词。</p><a href="/study/review" class="study-home-btn">开始复习</a></section></main>`;
       return;
@@ -55,12 +67,24 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
         button.disabled = true;
         const value = Number(button.dataset.rating);
         const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1] as Grade;
+        const reviewType = mode === "new" ? "new" : mode === "mandatory" ? "mandatory" : "self";
         try {
           const result = await review(item.word, rating);
           const reviewRows = await store.getReviews(item.word.id);
           const saved = reviewRows.find(row => row.id === result.reviewId);
-          if (saved) await uploadReview(saved);
-          await apiRequest("/study/today/progress", { method: "POST", body: JSON.stringify({ mode }) });
+          if (saved) {
+            saved.reviewType = reviewType;
+            await uploadReview(saved);
+          }
+          await apiRequest("/reviews", {
+            method: "POST",
+            body: JSON.stringify({ wordId: item.word.id, rating: value, reviewId: result.reviewId, reviewType,
+              reviewedAt: new Date().toISOString(), card: saved?.card ? {
+                reviewCount: saved.card.reviewCount, correctCount: saved.card.correctCount, wrongCount: saved.card.wrongCount,
+                state: saved.card.state, stability: saved.card.stability, difficulty: saved.card.difficulty, dueAt: saved.card.dueAt,
+              } : undefined }),
+          });
+          await apiRequest("/study/today/progress", { method: "POST", body: JSON.stringify({ mode: reviewType }) });
           index += 1;
           answerVisible = false;
           render();
