@@ -22,6 +22,28 @@ type AuthUser = { id?: string | number; [key: string]: unknown };
 let cachedAuthUser: unknown | undefined;
 let authCacheReady = false;
 let settingsQuotaCache: number | undefined;
+let speechCompletion: Promise<void> = Promise.resolve();
+let speechPatched = false;
+
+function patchSpeechRate() {
+  if (speechPatched || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    const synthesis = window.speechSynthesis;
+    const originalSpeak = synthesis.speak.bind(synthesis);
+    synthesis.speak = (utterance: SpeechSynthesisUtterance) => {
+      utterance.rate = 0.65;
+      let resolveSpeech!: () => void;
+      speechCompletion = new Promise<void>(resolve => { resolveSpeech = resolve; });
+      const finish = () => window.setTimeout(resolveSpeech, 450);
+      utterance.addEventListener("end", finish, { once: true });
+      utterance.addEventListener("error", finish, { once: true });
+      originalSpeak(utterance);
+    };
+    speechPatched = true;
+  } catch {}
+}
+
+patchSpeechRate();
 
 export function clearApiCaches() {
   cachedAuthUser = undefined;
@@ -69,6 +91,14 @@ async function afterAuthMe(user: unknown) {
   } catch {}
 }
 
+function selectionPath(path: string) {
+  return path === "/study/new-answer" || path === "/reviews" || path === "/study/known-exclude";
+}
+
+function sleep(ms: number) {
+  return new Promise<void>(resolve => window.setTimeout(resolve, ms));
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const requestInit = alignReviewIdentity(normalizedPath, init);
@@ -91,6 +121,10 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(String(body.error || `API ${response.status}`));
   }
   const result = await response.json() as T;
+  if (selectionPath(normalizedPath)) {
+    await speechCompletion.catch(() => undefined);
+    await sleep(350);
+  }
   if (normalizedPath === "/auth/me" || normalizedPath === "/auth/login" || normalizedPath === "/auth/register") {
     const user = (result as { user?: unknown }).user;
     await afterAuthMe(user);
