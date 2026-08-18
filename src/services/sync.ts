@@ -5,8 +5,10 @@ import { apiRequest } from "./api";
 
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
-type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
+type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[]; serverNow: string };
 type ServerReviewResult = { review: { id: string; reviewedAt: string }; card: ServerCard; duplicate?: boolean };
+
+const SYNC_CURSOR_KEY = "kaoyan-english-fsrs:study-sync-cursor";
 
 function serverStateToLocal(state: string): Card["state"] {
   const normalized = String(state).toLowerCase();
@@ -39,6 +41,14 @@ function remoteReviewToStored(remote: ServerReview, card: ServerCard | undefined
   return { id: remote.id, wordId: remote.wordId, reviewedAt: new Date(remote.reviewedAt).getTime(), rating: remote.rating as Rating, log: {} as ReviewLog, card: snapshot, reviewType: remote.reviewType, syncedAt: Date.now() };
 }
 
+function getSyncCursor(): string | null {
+  try { return localStorage.getItem(SYNC_CURSOR_KEY); } catch { return null; }
+}
+
+function setSyncCursor(value: string) {
+  try { localStorage.setItem(SYNC_CURSOR_KEY, value); } catch { /* storage can be unavailable in private/restricted contexts */ }
+}
+
 export async function pushPendingReviews(): Promise<number> {
   const localReviews = await store.getPendingReviews();
   let uploaded = 0;
@@ -51,10 +61,13 @@ export async function pushPendingReviews(): Promise<number> {
 
 export async function syncStudyData(): Promise<{ cards: number; reviews: number; uploaded: number }> {
   const uploaded = await pushPendingReviews();
-  const server = await apiRequest<SyncResponse>("/sync/study");
+  const cursor = getSyncCursor();
+  const query = cursor ? `?since=${encodeURIComponent(cursor)}` : "";
+  const server = await apiRequest<SyncResponse>(`/sync/study${query}`);
   const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
+
   for (const remote of server.reviews) {
     if (!localById.has(remote.id)) await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
   }
@@ -69,6 +82,8 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
     const remoteTime = remote.lastReviewAt ? new Date(remote.lastReviewAt).getTime() : 0;
     if (!local || remoteTime >= latestLocal) await store.putCard(serverCardToLocal(remote));
   }
+
+  setSyncCursor(server.serverNow);
   return { cards: server.cards.length, reviews: server.reviews.length, uploaded };
 }
 
