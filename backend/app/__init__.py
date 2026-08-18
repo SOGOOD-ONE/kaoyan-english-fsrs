@@ -15,13 +15,13 @@ def ensure_schema_compatibility():
         columns = {column["name"] for column in inspector.get_columns("user_settings")}
         if "daily_review_quota" not in columns:
             db.session.execute(text("ALTER TABLE user_settings ADD COLUMN daily_review_quota INTEGER NOT NULL DEFAULT 100"))
-            db.session.commit()
     if "user_word_cards" in tables:
         columns = {column["name"] for column in inspector.get_columns("user_word_cards")}
         additions = {
             "known_excluded": "ALTER TABLE user_word_cards ADD COLUMN known_excluded BOOLEAN NOT NULL DEFAULT 0",
             "new_ec_correct": "ALTER TABLE user_word_cards ADD COLUMN new_ec_correct INTEGER NOT NULL DEFAULT 0",
             "new_ce_correct": "ALTER TABLE user_word_cards ADD COLUMN new_ce_correct INTEGER NOT NULL DEFAULT 0",
+            "new_complete": "ALTER TABLE user_word_cards ADD COLUMN new_complete BOOLEAN NOT NULL DEFAULT 0",
         }
         changed = False
         for name, statement in additions.items():
@@ -29,6 +29,11 @@ def ensure_schema_compatibility():
                 db.session.execute(text(statement))
                 changed = True
         if changed:
+            db.session.commit()
+    if "daily_plans" in tables:
+        columns = {column["name"] for column in inspector.get_columns("daily_plans")}
+        if "mandatory_source_date" not in columns:
+            db.session.execute(text("ALTER TABLE daily_plans ADD COLUMN mandatory_source_date DATE"))
             db.session.commit()
 
 
