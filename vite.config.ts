@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: "/kaoyan-english-fsrs/",
+  base: "/",
   plugins: [
     {
       name: "auth-gate-inject",
