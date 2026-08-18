@@ -47,12 +47,9 @@ export async function mountDashboard(root: HTMLElement) {
           <section class="dashboard-time-grid"><div class="dashboard-time-card"><span>今日学习时长</span><strong>${formatDuration(time.todaySeconds)}</strong></div><div class="dashboard-time-card"><span>总学习时长</span><strong>${formatDuration(time.totalSeconds)}</strong></div><div class="dashboard-time-card"><span>活跃天数</span><strong>${activeDays}</strong></div></section>
           <section class="dashboard-actions">
             <a class="study-action review-required" href="/study/review"><span class="study-action-title">${reviewRequired ? "先完成今日复习" : "开始复习"}</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项 · 已完成 ${reviewLabel}` : reviewLabel}</span><span class="study-action-arrow">→</span></a>
-            <div class="study-action ${reviewRequired ? "locked" : ""}" ${reviewRequired ? `aria-disabled="true" data-locked="1"` : ""}>
-              <span class="study-action-title">学习新词</span>
-              <span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span>
-              <span class="study-action-arrow">${reviewRequired ? "🔒" : newRemaining > 0 ? "→" : "✓"}</span>
-              ${reviewRequired || newRemaining === 0 ? "" : `<a class="study-action-cover" href="/study/new" aria-label="开始学习新词"></a>`}
-            </div>
+            ${reviewRequired || newRemaining === 0
+              ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">${reviewRequired ? "🔒" : "✓"}</span></div>`
+              : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">→</span></a>`}
             <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span><span class="study-action-desc">按照 FSRS 当前到期状态复习已经学习过的单词</span><span class="study-action-arrow">→</span></a>
           </section>
         </main>
