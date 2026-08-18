@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Blueprint, jsonify, request
 
@@ -7,6 +8,24 @@ from .api import login_required, selected_word_ids
 from .models import DailyPlan, StudySession, UserSetting, UserWordCard, ReviewLog
 
 study_plan_api = Blueprint("study_plan_api", __name__)
+
+
+def get_user_timezone(user):
+    settings = UserSetting.query.filter_by(user_id=user.id).first()
+    try:
+        return ZoneInfo(settings.timezone if settings and settings.timezone else "Asia/Shanghai")
+    except Exception:
+        return ZoneInfo("Asia/Shanghai")
+
+
+def local_today(user):
+    return datetime.now(timezone.utc).astimezone(get_user_timezone(user)).date()
+
+
+def local_day_start_utc(user, day):
+    zone = get_user_timezone(user)
+    local_start = datetime.combine(day, time.min, tzinfo=zone)
+    return local_start.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def today_due_cards(user):
@@ -24,7 +43,7 @@ def today_due_cards(user):
 
 
 def get_or_create_plan(user):
-    today = date.today()
+    today = local_today(user)
     settings = UserSetting.query.filter_by(user_id=user.id).first()
     quota = settings.daily_new_quota if settings else 100
     review_quota = settings.daily_review_quota if settings else 100
@@ -191,8 +210,8 @@ def stop_study_session(user, session_id):
 @study_plan_api.get("/study/time")
 @login_required
 def study_time(user):
-    today = date.today()
-    start = datetime.combine(today, datetime.min.time())
+    today = local_today(user)
+    start = local_day_start_utc(user, today)
     sessions = StudySession.query.filter(
         StudySession.user_id == user.id,
         StudySession.started_at >= start,
