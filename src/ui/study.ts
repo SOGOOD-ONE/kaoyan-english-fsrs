@@ -18,10 +18,6 @@ function escapeHtml(value: string) {
 }
 
 async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
-  await syncStudyData().catch(() => undefined);
-  const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
-  const byId = new Map(words.map(word => [word.id, word]));
-
   if (mode === "new") {
     const queue = await apiRequest<NewQueue>("/study/new-queue");
     if (!queue.newUnlocked) throw new Error(`今天还有 ${queue.mandatoryRemaining} 项必做复习，请先完成复习。`);
@@ -29,12 +25,14 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
   }
   if (mode === "mandatory") {
     const queue = await apiRequest<ReviewQueue>("/study/review-queue");
-    const items = queue.words
-      .map(entry => ({ word: byId.get(entry.id) || entry, card: entry.card }))
-      .filter(item => item.word);
+    const items = queue.words.map(entry => ({ word: entry, card: entry.card }));
     return { items, total: items.length };
   }
 
+  // 自主复习需要本地 FSRS 状态，因此进入前同步一次服务器状态；新词/必做复习无需这次额外同步。
+  await syncStudyData().catch(() => undefined);
+  const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
+  const byId = new Map(words.map(word => [word.id, word]));
   const cards = await apiRequest<ServerCard[]>("/cards");
   const learned = cards
     .filter(card => card.reviewCount > 0 && byId.has(card.wordId))
@@ -99,10 +97,9 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
 
           const server = await submitReviewToServer(saved);
           await store.markReviewSynced(saved.id);
-          await syncStudyData();
-
+          // 不再为每个评分做完整的 /sync/study；服务器提交已经返回最新 card/today 状态。
           if (reviewType === "mandatory" && server.today.mandatoryRemaining > 0) {
-            // The authoritative server queue is reloaded on the next render/entry.
+            // 服务器队列会在下一次进入时提供准确剩余项。
           }
           if (reviewType === "new" && server.today.newCompleted >= server.today.newQuota) {
             index = total - 1;
