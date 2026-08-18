@@ -36,6 +36,15 @@ function installAuthNavigation() {
   }, true);
 }
 
+async function requireAuth(): Promise<boolean> {
+  try {
+    const result = await apiRequest<{ user: unknown }>("/auth/me");
+    if (result?.user) return true;
+  } catch {}
+  location.href = appPath("/login");
+  return false;
+}
+
 async function bootstrap() {
   installBasePathNavigation();
   installAuthNavigation();
@@ -45,9 +54,9 @@ async function bootstrap() {
   path = path.replace(/\/+$/, "") || "/";
   if (path === "/login") { await mountAuth(appRoot, "login"); return; }
   if (path === "/register") { await mountAuth(appRoot, "register"); return; }
-  if (path === "/settings") { await mountSettings(appRoot); return; }
-  if (path === "/vocabularies") { await mountVocabularies(appRoot); return; }
-  if (path === "/history") { await mountHistory(appRoot); return; }
+  if (path === "/settings") { if (await requireAuth()) await mountSettings(appRoot); return; }
+  if (path === "/vocabularies") { if (await requireAuth()) await mountVocabularies(appRoot); return; }
+  if (path === "/history") { if (await requireAuth()) await mountHistory(appRoot); return; }
   try {
     const me = await apiRequest<{ user: unknown }>("/auth/me");
     if (me?.user) { try { await syncStudyData(); } catch (error) { console.warn("Cloud sync skipped:", error); } }
@@ -57,5 +66,5 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
   console.error(error);
-  appRoot.innerHTML = `<main style="padding:24px;font-family:system-ui"><h1>应用启动失败</h1><p>请刷新页面后重试。</p></main>`;
+  appRoot.innerHTML = `<main style="padding:24px;font-family:system-ui"><h1>应用启动失败</h1><p>请刷新页面后重试。</p></p></main>`;
 });
