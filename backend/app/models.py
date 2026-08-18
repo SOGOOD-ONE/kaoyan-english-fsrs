@@ -117,6 +117,16 @@ class ReviewLog(db.Model):
     elapsed_seconds = db.Column(db.Integer)
 
 
+class StudySession(db.Model):
+    __tablename__ = 'study_sessions'
+    id = db.Column(db.String(36), primary_key=True, default=uid)
+    user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    mode = db.Column(db.String(20), nullable=False, default='new')
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    ended_at = db.Column(db.DateTime)
+    duration_seconds = db.Column(db.Integer, nullable=False, default=0)
+
+
 class DailyPlan(db.Model):
     __tablename__ = 'daily_plans'
     id = db.Column(db.String(36), primary_key=True, default=uid)
