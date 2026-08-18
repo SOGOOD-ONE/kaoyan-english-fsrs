@@ -6,6 +6,8 @@ import { apiRequest } from "./api";
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
+type ServerReviewResult = { review: { id: string; reviewedAt: string }; card: ServerCard; duplicate?: boolean };
+type ServerToday = { mandatoryCompleted: number; mandatoryTotal: number; mandatoryRemaining: number; newCompleted: number; newQuota: number; reviewRemaining?: number };
 
 function serverStateToLocal(state: string): Card["state"] {
   const normalized = String(state).toLowerCase();
@@ -49,21 +51,15 @@ export async function pushPendingReviews(): Promise<number> {
 }
 
 export async function syncStudyData(): Promise<{ cards: number; reviews: number; uploaded: number }> {
-  // The server is authoritative. Flush any offline reviews first, then hydrate local state from it.
   const uploaded = await pushPendingReviews();
   const server = await apiRequest<SyncResponse>("/sync/study");
   const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
-
-  // Replace/refresh remote reviews locally. Remote data is authoritative for already-synced review IDs.
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
   for (const remote of server.reviews) {
-    if (!localById.has(remote.id)) {
-      await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
-    }
+    if (!localById.has(remote.id)) await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
   }
 
-  // A remote card wins over a stale local card. A newer unsynced local review is preserved so it can be uploaded first.
   const localCards = await store.getCards();
   const localCardByWord = new Map(localCards.map(c => [c.wordId, c]));
   const pendingIds = new Set((await store.getPendingReviews()).map(r => r.id));
@@ -77,7 +73,31 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
   return { cards: server.cards.length, reviews: server.reviews.length, uploaded };
 }
 
-export async function uploadReview(review: StoredReview): Promise<void> {
+export async function submitReviewToServer(review: StoredReview): Promise<{ result: ServerReviewResult; today: ServerToday }> {
   const localCard = review.card;
-  await apiRequest("/reviews", { method: "POST", body: JSON.stringify({ reviewId: review.id, wordId: review.wordId, rating: review.rating, reviewType: review.reviewType || "review", reviewedAt: new Date(review.reviewedAt).toISOString(), card: localCard ? { state: localStateToServer(localCard.state), stability: localCard.stability, difficulty: localCard.difficulty, dueAt: localCard.due.toISOString(), reviewCount: localCard.reps, wrongCount: localCard.lapses, correctCount: Math.max(0, localCard.reps - localCard.lapses) } : undefined }) });
+  const result = await apiRequest<ServerReviewResult>("/reviews", {
+    method: "POST",
+    body: JSON.stringify({
+      reviewId: review.id,
+      wordId: review.wordId,
+      rating: review.rating,
+      reviewType: review.reviewType || "review",
+      reviewedAt: new Date(review.reviewedAt).toISOString(),
+      card: localCard ? {
+        state: localStateToServer(localCard.state),
+        stability: localCard.stability,
+        difficulty: localCard.difficulty,
+        dueAt: localCard.due.toISOString(),
+        reviewCount: localCard.reps,
+        wrongCount: localCard.lapses,
+        correctCount: Math.max(0, localCard.reps - localCard.lapses),
+      } : undefined,
+    }),
+  });
+  const today = await apiRequest<ServerToday>("/study/today/progress");
+  return { result, today };
+}
+
+export async function uploadReview(review: StoredReview): Promise<void> {
+  await submitReviewToServer(review);
 }
