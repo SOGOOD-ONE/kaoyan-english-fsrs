@@ -8,8 +8,9 @@ import { syncStudyData, uploadReview } from "../services/sync";
 type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
-type Today = { review: ServerCard[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number; mandatoryCompleted: number; mandatoryTotal: number; mandatoryRemaining: number; newUnlocked: boolean };
+type Today = { review: ServerCard[]; newUnlocked: boolean; mandatoryRemaining: number; mandatoryCompleted: number; mandatoryTotal: number };
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
+type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; completed: number; words: ServerWord[] };
 type Item = { word: ServerWord; card?: ServerCard };
 
 function escapeHtml(value: string) {
@@ -26,7 +27,11 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
   const byId = new Map(words.map(word => [word.id, word]));
 
   if (mode === "new") {
-    return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
+    const queue = await apiRequest<NewQueue>("/study/new-queue");
+    if (!queue.newUnlocked) {
+      throw new Error(`今天还有 ${queue.mandatoryRemaining} 项必做复习，请先完成复习。`);
+    }
+    return { items: queue.words.map(word => ({ word })), total: queue.words.length };
   }
   if (mode === "mandatory") {
     const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
