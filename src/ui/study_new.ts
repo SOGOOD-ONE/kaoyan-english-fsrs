@@ -130,7 +130,7 @@ export async function mountNewStudy(root: HTMLElement) {
       const action = actionElement.dataset.action;
       if (action === "known") {
         locked = true;
-        actionElement.disabled = true;
+        (actionElement as HTMLButtonElement).disabled = true;
         try {
           await apiRequest("/study/known-exclude", { method: "POST", body: JSON.stringify({ wordId: selectedWord.id, mode: "new" }) });
           selectedWord.card.knownExcluded = true;
