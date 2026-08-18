@@ -91,14 +91,22 @@ def answer_new_word(user):
 
     ec_correct = int(card.new_ec_correct or 0)
     ce_correct = int(card.new_ce_correct or 0)
+    
     if card.new_complete or (ec_correct >= 2 and ce_correct >= 1):
         card.new_complete = True
         db.session.commit()
-        return jsonify({"error": "new_learning_complete", "card": card_json(card)}), 409
+        return jsonify({
+            "ok": True,
+            "completed": True,
+            "card": card_json(card)})
 
     expected_direction = "ce" if ec_correct >= 2 else "ec"
     if direction != expected_direction:
-        return jsonify({"error": "wrong_learning_stage", "expectedDirection": expected_direction, "card": card_json(card)}), 409
+        return jsonify({
+            "ok": False,
+            "stageMismatch": True,
+            "expectedDirection": expected_direction,
+            "card": card_json(card)})
 
     correct_answer = word.word if direction == "ce" else word.meaning
     card.new_attempts = int(card.new_attempts or 0) + 1
