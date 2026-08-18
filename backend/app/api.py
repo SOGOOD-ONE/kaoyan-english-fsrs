@@ -89,13 +89,26 @@ def apply_card_snapshot_monotonic(card, snapshot, reviewed_at):
     if current_reviewed_at is not None and reviewed_at <= current_reviewed_at:
         return False
     try:
-        card.state = str(snapshot.get("state", card.state))
-        card.stability = float(snapshot.get("stability", card.stability or 0.0))
-        card.difficulty = float(snapshot.get("difficulty", card.difficulty or 5.0))
-        card.due_at = parse_client_datetime(snapshot.get("dueAt"), card.due_at)
-        card.review_count = int(snapshot.get("reviewCount", card.review_count or 0))
-        card.wrong_count = int(snapshot.get("wrongCount", card.wrong_count or 0))
-        card.correct_count = int(snapshot.get("correctCount", card.correct_count or 0))
+        # Validate and apply card snapshot with bounds checking
+        valid_states = {"new", "learning", "review", "relearning"}
+        new_state = str(snapshot.get("state", card.state))
+        if new_state in valid_states:
+            card.state = new_state
+        new_stability = float(snapshot.get("stability", card.stability or 0.0))
+        card.stability = max(0.0, min(new_stability, 36500.0))  # 100yr max
+        new_difficulty = float(snapshot.get("difficulty", card.difficulty or 5.0))
+        card.difficulty = max(1.0, min(new_difficulty, 10.0))  # FSRS difficulty range
+        new_due = parse_client_datetime(snapshot.get("dueAt"), card.due_at)
+        # Clamp due_at to reasonable range (within 100 years)
+        max_due = datetime.utcnow() + timedelta(days=36500)
+        if new_due and new_due <= max_due:
+            card.due_at = new_due
+        new_review_count = int(snapshot.get("reviewCount", card.review_count or 0))
+        card.review_count = max(0, min(new_review_count, 100000))
+        new_wrong_count = int(snapshot.get("wrongCount", card.wrong_count or 0))
+        card.wrong_count = max(0, min(new_wrong_count, 100000))
+        new_correct_count = int(snapshot.get("correctCount", card.correct_count or 0))
+        card.correct_count = max(0, min(new_correct_count, 100000))
     except (TypeError, ValueError):
         raise ValueError("invalid_card")
     return True
@@ -233,7 +246,12 @@ def submit_review_compat(user):
         db.session.add(card)
         db.session.flush()
 
-    reviewed_at = parse_client_datetime(data.get("reviewedAt"), datetime.utcnow())
+    # Use server time as authoritative (security: prevent client time manipulation)
+    reviewed_at = datetime.utcnow()
+    # Allow client time only within ±5 minute window for offline scenarios
+    # client_reviewed_at = parse_client_datetime(data.get("reviewedAt"), None)
+    # if client_reviewed_at and abs((client_reviewed_at - reviewed_at).total_seconds()) < 300:
+    #     reviewed_at = client_reviewed_at
     review_type = str(data.get("reviewType", "review"))
     try:
         rating = int(data.get("rating", 3))
