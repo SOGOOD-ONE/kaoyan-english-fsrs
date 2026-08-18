@@ -18,7 +18,7 @@ function escapeHtml(value: string) {
 }
 function shuffle<T>(values: T[]) { return [...values].sort(() => Math.random() - 0.5); }
 function randomGap() { return 5 + Math.floor(Math.random() * 4); }
-function newDirection(card: NewCard): Direction { return card.newAttempts >= 2 ? "ce" : "ec"; }
+function newDirection(card: NewCard): Direction { return card.newEcCorrect >= 2 ? "ce" : "ec"; }
 function wait(ms: number) { return new Promise<void>(resolve => window.setTimeout(resolve, ms)); }
 function speakEnglish(text: string) {
   if (!text.trim() || !("speechSynthesis" in window)) return;

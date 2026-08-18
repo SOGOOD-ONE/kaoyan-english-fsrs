@@ -130,7 +130,7 @@ async function speakCorrectNewAnswer(answer: string) {
 
 export const API_TIMEOUT = 15000; // 15 second timeout
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const requestInit = alignReviewIdentity(normalizedPath, init);
 
