@@ -5,18 +5,17 @@ from .models import UserSetting
 
 DEFAULT_TIMEZONE = "Asia/Shanghai"
 MANDATORY_REFRESH_HOUR = 6
+BEIJING_ZONE = ZoneInfo(DEFAULT_TIMEZONE)
 
 
 def user_timezone(user):
-    settings = UserSetting.query.filter_by(user_id=user.id).first()
-    try:
-        return ZoneInfo(settings.timezone if settings and settings.timezone else DEFAULT_TIMEZONE)
-    except Exception:
-        return ZoneInfo(DEFAULT_TIMEZONE)
+    # The application uses Beijing time globally. Keep this helper so all
+    # existing date/time code continues to share one timezone source.
+    return BEIJING_ZONE
 
 
 def local_now(user):
-    return datetime.now(timezone.utc).astimezone(user_timezone(user))
+    return datetime.now(timezone.utc).astimezone(BEIJING_ZONE)
 
 
 def local_today(user):
@@ -24,21 +23,17 @@ def local_today(user):
 
 
 def local_day_start_utc(user, day: date):
-    zone = user_timezone(user)
-    local_start = datetime.combine(day, time.min, tzinfo=zone)
+    local_start = datetime.combine(day, time.min, tzinfo=BEIJING_ZONE)
     return local_start.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def local_day_end_utc(user, day: date):
-    zone = user_timezone(user)
-    local_end = datetime.combine(day, time.max, tzinfo=zone)
+    local_end = datetime.combine(day, time.max, tzinfo=BEIJING_ZONE)
     return local_end.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def mandatory_source_date(user):
     now = local_now(user)
-    # The mandatory-review batch refreshes at 06:00 local time and targets
-    # the previous calendar day's completed new-word learning.
     return now.date() - timedelta(days=1 if now.hour >= MANDATORY_REFRESH_HOUR else 2)
 
 
