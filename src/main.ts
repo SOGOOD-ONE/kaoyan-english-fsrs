@@ -10,29 +10,19 @@ import { apiRequest } from "./services/api";
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app");
 const appRoot: HTMLElement = root;
-const BASE_PATH = "/kaoyan-english-fsrs";
+const BASE_PATH = "";
 
 export function appPath(path = "/") {
-  return `${BASE_PATH}${path === "/" ? "/" : path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function installBasePathNavigation() {
-  document.addEventListener("click", (event) => {
-    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    const anchor = (event.target as HTMLElement | null)?.closest<HTMLAnchorElement>("a[href]");
-    if (!anchor) return;
-    const href = anchor.getAttribute("href");
-    if (!href || !href.startsWith("/") || href.startsWith(BASE_PATH + "/") || href === BASE_PATH) return;
-    event.preventDefault();
-    location.href = appPath(href);
-  }, true);
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
 function installAuthNavigation() {
   document.addEventListener("click", (event) => {
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>("[data-requires-auth]");
     if (!target) return;
-    event.preventDefault(); event.stopPropagation(); location.href = appPath("/login");
+    event.preventDefault();
+    event.stopPropagation();
+    location.href = appPath("/login");
   }, true);
 }
 
@@ -46,11 +36,10 @@ async function requireAuth(): Promise<boolean> {
 }
 
 async function bootstrap() {
-  installBasePathNavigation();
   installAuthNavigation();
   let path = window.location.pathname;
-  if (path === BASE_PATH) path = "/";
-  else if (path.startsWith(BASE_PATH + "/")) path = path.slice(BASE_PATH.length) || "/";
+  if (BASE_PATH && path === BASE_PATH) path = "/";
+  else if (BASE_PATH && path.startsWith(BASE_PATH + "/")) path = path.slice(BASE_PATH.length) || "/";
   path = path.replace(/\/+$/, "") || "/";
   if (path === "/login") { await mountAuth(appRoot, "login"); return; }
   if (path === "/register") { await mountAuth(appRoot, "register"); return; }
