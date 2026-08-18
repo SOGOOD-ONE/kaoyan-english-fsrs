@@ -90,13 +90,25 @@ def stop_study_session(user, session_id):
 @study_plan_api.get("/study/time")
 @login_required
 def study_time(user):
-    today = date.today(); start = datetime.combine(today, datetime.min.time())
-    sessions = StudySession.query.filter(StudySession.user_id == user.id, StudySession.started_at >= start, StudySession.ended_at.isnot(None)).all()
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+    sessions = StudySession.query.filter(
+        StudySession.user_id == user.id,
+        StudySession.started_at >= start,
+        StudySession.ended_at.isnot(None),
+    ).all()
     today_seconds = sum(int(row.duration_seconds or 0) for row in sessions)
-    total_seconds = sum(int(value or 0) for value in db.session.query(db.func.sum(StudySession.duration_seconds)).filter(StudySession.user_id == user.id).all())
+    total_seconds = db.session.query(
+        db.func.coalesce(db.func.sum(StudySession.duration_seconds), 0)
+    ).filter(StudySession.user_id == user.id).scalar() or 0
+    total_seconds = int(total_seconds)
+
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     if active:
-        elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds())); today_seconds += elapsed; total_seconds += elapsed
+        elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds()))
+        today_seconds += elapsed
+        total_seconds += elapsed
+
     return jsonify({"todaySeconds": today_seconds, "totalSeconds": total_seconds, "activeSessionId": active.id if active else None})
 
 
