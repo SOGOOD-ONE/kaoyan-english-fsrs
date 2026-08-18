@@ -7,21 +7,10 @@ import { syncStudyData, uploadReview } from "../services/sync";
 
 type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
-type Today = {
-  review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[];
-  newWords: ServerWord[];
-  newTotal: number;
-  newCompleted: number;
-  reviewTotal: number;
-  reviewCompleted: number;
-  mandatoryCompleted: number;
-  mandatoryTotal: number;
-  mandatoryRemaining: number;
-  newUnlocked: boolean;
-};
-
+type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
+type Today = { review: ServerCard[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number; mandatoryCompleted: number; mandatoryTotal: number; mandatoryRemaining: number; newUnlocked: boolean };
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
-type Item = { word: ServerWord; card?: Today["review"][number] };
+type Item = { word: ServerWord; card?: ServerCard };
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]!));
@@ -35,9 +24,25 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
   }
   const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
   const byId = new Map(words.map(word => [word.id, word]));
-  if (mode === "new") return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
-  const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
-  return { items, total: today.reviewTotal };
+
+  if (mode === "new") {
+    return { items: today.newWords.map(word => ({ word })), total: today.newTotal };
+  }
+  if (mode === "mandatory") {
+    const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
+    return { items, total: items.length };
+  }
+
+  const cards = await apiRequest<ServerCard[]>("/cards");
+  const learned = cards
+    .filter(card => card.reviewCount > 0 && byId.has(card.wordId))
+    .sort((a, b) => {
+      const dueDelta = new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
+      if (dueDelta !== 0) return dueDelta;
+      return new Date(b.lastReviewAt || 0).getTime() - new Date(a.lastReviewAt || 0).getTime();
+    });
+  const items = learned.map(card => ({ word: byId.get(card.wordId)!, card }));
+  return { items, total: items.length };
 }
 
 export async function mountStudy(root: HTMLElement, mode: Mode) {
@@ -59,7 +64,7 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
       const item = items[index];
       const percent = total ? Math.min(100, Math.round((index / total) * 100)) : 100;
       const title = mode === "new" ? "学习新词" : mode === "mandatory" ? "今日复习" : "自主复习";
-      const desc = mode === "new" ? "完成今天的新词学习" : mode === "mandatory" ? "完成今天必须完成的复习" : "复习当前已经到期的单词";
+      const desc = mode === "new" ? "完成今天的新词学习" : mode === "mandatory" ? "完成今天必须完成的复习" : "可以自由复习已经学习过的单词";
       root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2>${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button>${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 ${Math.min(index, total)} 个 · 本次进度会同步到你的账号</div></main>`;
 
       document.getElementById("study-reveal")?.addEventListener("click", () => { answerVisible = !answerVisible; render(); });
@@ -76,14 +81,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
             saved.reviewType = reviewType;
             await uploadReview(saved);
           }
-          await apiRequest("/reviews", {
-            method: "POST",
-            body: JSON.stringify({ wordId: item.word.id, rating: value, reviewId: result.reviewId, reviewType,
-              reviewedAt: new Date().toISOString(), card: saved?.card ? {
-                reviewCount: saved.card.reviewCount, correctCount: saved.card.correctCount, wrongCount: saved.card.wrongCount,
-                state: saved.card.state, stability: saved.card.stability, difficulty: saved.card.difficulty, dueAt: saved.card.dueAt,
-              } : undefined }),
-          });
           await apiRequest("/study/today/progress", { method: "POST", body: JSON.stringify({ mode: reviewType }) });
           index += 1;
           answerVisible = false;
