@@ -29,6 +29,20 @@ def card_retrievability(card, now=None):
     return 0.9 ** (elapsed_days / max(float(card.stability), 1e-6))
 
 
+def today_due_cards(user):
+    selected_ids = selected_word_ids(user)
+    query = UserWordCard.query.filter(
+        UserWordCard.user_id == user.id,
+        UserWordCard.due_at <= datetime.utcnow(),
+        UserWordCard.state != "new",
+    )
+    if selected_ids:
+        query = query.filter(UserWordCard.word_id.in_(selected_ids))
+    else:
+        query = query.filter(False)
+    return query.order_by(UserWordCard.due_at.asc()).all()
+
+
 @study_plan_api.get("/study/overview")
 @login_required
 def study_overview(user):
@@ -47,8 +61,24 @@ def study_overview(user):
 @login_required
 def get_today_progress(user):
     plan = get_or_create_plan(user)
+    due = today_due_cards(user)
+    # Snapshot the amount of mandatory review when the day is first established.
+    # Once set, it does not shrink as cards are reviewed.
+    if plan.mandatory_total == 0 and plan.mandatory_completed == 0 and due:
+        plan.mandatory_total = len(due)
+        db.session.commit()
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    return jsonify({"date": plan.plan_date.isoformat(), "newQuota": plan.new_quota, "newCompleted": plan.new_completed, "mandatoryTotal": plan.mandatory_total, "mandatoryCompleted": plan.mandatory_completed, "selfTotal": plan.self_total, "selfCompleted": plan.self_completed, "activeSessionId": active.id if active else None})
+    return jsonify({
+        "date": plan.plan_date.isoformat(),
+        "newQuota": plan.new_quota,
+        "newCompleted": plan.new_completed,
+        "mandatoryTotal": plan.mandatory_total,
+        "mandatoryCompleted": min(plan.mandatory_completed, plan.mandatory_total),
+        "selfTotal": plan.self_total,
+        "selfCompleted": plan.self_completed,
+        "activeSessionId": active.id if active else None,
+        "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed),
+    })
 
 
 @study_plan_api.post("/study/today/progress")
@@ -56,12 +86,15 @@ def get_today_progress(user):
 def record_today_progress(user):
     data = request.get_json(silent=True) or {}
     mode = str(data.get("mode", "new"))
-    if mode not in {"new", "mandatory", "self"}: return jsonify({"error": "invalid_mode"}), 400
+    if mode not in {"new", "mandatory", "self"}:
+        return jsonify({"error": "invalid_mode"}), 400
     plan = get_or_create_plan(user)
     field = {"new": "new_completed", "mandatory": "mandatory_completed", "self": "self_completed"}[mode]
     setattr(plan, field, int(getattr(plan, field) or 0) + 1)
+    if mode == "mandatory":
+        plan.mandatory_completed = min(plan.mandatory_completed, plan.mandatory_total)
     db.session.commit()
-    return jsonify({"ok": True, "mode": mode, "completed": getattr(plan, field)})
+    return jsonify({"ok": True, "mode": mode, "completed": getattr(plan, field), "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed)})
 
 
 @study_plan_api.post("/study/session/start")
@@ -69,11 +102,14 @@ def record_today_progress(user):
 def start_study_session(user):
     data = request.get_json(silent=True) or {}
     mode = str(data.get("mode", "new"))
-    if mode not in {"new", "mandatory", "self"}: return jsonify({"error": "invalid_mode"}), 400
+    if mode not in {"new", "mandatory", "self"}:
+        return jsonify({"error": "invalid_mode"}), 400
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    if active: return jsonify({"sessionId": active.id, "startedAt": active.started_at.isoformat(), "mode": active.mode})
+    if active:
+        return jsonify({"sessionId": active.id, "startedAt": active.started_at.isoformat(), "mode": active.mode})
     session = StudySession(user_id=user.id, mode=mode, started_at=datetime.utcnow())
-    db.session.add(session); db.session.commit()
+    db.session.add(session)
+    db.session.commit()
     return jsonify({"sessionId": session.id, "startedAt": session.started_at.isoformat(), "mode": session.mode})
 
 
@@ -81,9 +117,13 @@ def start_study_session(user):
 @login_required
 def stop_study_session(user, session_id):
     session = StudySession.query.filter_by(id=session_id, user_id=user.id).first()
-    if not session: return jsonify({"error": "session_not_found"}), 404
+    if not session:
+        return jsonify({"error": "session_not_found"}), 404
     if session.ended_at is None:
-        ended_at = datetime.utcnow(); session.ended_at = ended_at; session.duration_seconds = max(0, int((ended_at - session.started_at).total_seconds())); db.session.commit()
+        ended_at = datetime.utcnow()
+        session.ended_at = ended_at
+        session.duration_seconds = max(0, int((ended_at - session.started_at).total_seconds()))
+        db.session.commit()
     return jsonify({"sessionId": session.id, "durationSeconds": session.duration_seconds, "startedAt": session.started_at.isoformat(), "endedAt": session.ended_at.isoformat() if session.ended_at else None, "mode": session.mode})
 
 
