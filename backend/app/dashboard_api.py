@@ -25,19 +25,22 @@ def build_overview(user):
         UserWordCard.user_id == user.id,
         UserWordCard.word_id.in_(word_ids),
     ).all()
-    logs = ReviewLog.query.filter(
-        ReviewLog.user_id == user.id,
-        ReviewLog.word_id.in_(word_ids),
-    ).all()
 
-    reviews_by_word = {}
-    for log in logs:
-        reviews_by_word[log.word_id] = reviews_by_word.get(log.word_id, 0) + 1
+    # Count reviews in SQL instead of loading every ReviewLog row into Python.
+    review_counts = dict(
+        db.session.query(ReviewLog.word_id, func.count(ReviewLog.id))
+        .filter(
+            ReviewLog.user_id == user.id,
+            ReviewLog.word_id.in_(word_ids),
+        )
+        .group_by(ReviewLog.word_id)
+        .all()
+    )
 
     card_by_word = {card.word_id: card for card in cards}
-    learned_ids = {word_id for word_id, count in reviews_by_word.items() if count > 0}
+    learned_ids = set(review_counts)
     learned_ids.update(card.word_id for card in cards if card.first_learned_at is not None)
-    reviewed_ids = {word_id for word_id, count in reviews_by_word.items() if count >= 2}
+    reviewed_ids = {word_id for word_id, count in review_counts.items() if count >= 2}
     reviewed_ids.update(card.word_id for card in cards if card.review_count >= 2)
 
     mastered_ids = set()
