@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from . import db
 from .api import login_required
 from .models import DailyPlan, UserSetting, UserVocabulary, UserWordCard, VocabularyWord
+from .time_utils import local_today
 
 review_quota_api = Blueprint("review_quota_api", __name__)
 
@@ -56,7 +57,7 @@ def update_review_quota(user):
     else:
         settings.daily_review_quota = quota
 
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=db.func.current_date()).first()
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=local_today(user)).first()
     if plan:
         refresh_unstarted_review_total(user, plan, quota)
 
