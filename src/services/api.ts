@@ -23,6 +23,7 @@ let cachedAuthUser: unknown | undefined;
 let authCacheReady = false;
 let settingsQuotaCache: number | undefined;
 let speechCompletion: Promise<void> = Promise.resolve();
+let speechPending = false;
 let speechPatched = false;
 
 function patchSpeechRate() {
@@ -32,9 +33,13 @@ function patchSpeechRate() {
     const originalSpeak = synthesis.speak.bind(synthesis);
     synthesis.speak = (utterance: SpeechSynthesisUtterance) => {
       utterance.rate = 0.75;
+      speechPending = true;
       let resolveSpeech!: () => void;
       speechCompletion = new Promise<void>(resolve => { resolveSpeech = resolve; });
-      const finish = () => window.setTimeout(resolveSpeech, 0);
+      const finish = () => {
+        speechPending = false;
+        window.setTimeout(resolveSpeech, 0);
+      };
       utterance.addEventListener("end", finish, { once: true });
       utterance.addEventListener("error", finish, { once: true });
       originalSpeak(utterance);
@@ -122,8 +127,12 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   }
   const result = await response.json() as T;
   if (selectionPath(normalizedPath)) {
-    await speechCompletion.catch(() => undefined);
-    await sleep(100);
+    if (speechPending) {
+      await speechCompletion.catch(() => undefined);
+      await sleep(100);
+    } else {
+      await sleep(600);
+    }
   }
   if (normalizedPath === "/auth/me" || normalizedPath === "/auth/login" || normalizedPath === "/auth/register") {
     const user = (result as { user?: unknown }).user;
