@@ -1,10 +1,11 @@
 from datetime import date, datetime
+import math
 
 from flask import Blueprint, jsonify, request
 
 from . import db
-from .api import login_required
-from .models import DailyPlan, StudySession, UserSetting
+from .api import login_required, selected_word_ids
+from .models import DailyPlan, StudySession, UserWordCard, UserSetting
 
 study_plan_api = Blueprint("study_plan_api", __name__)
 
@@ -19,6 +20,52 @@ def get_or_create_plan(user):
         db.session.add(plan)
         db.session.commit()
     return plan
+
+
+def card_retrievability(card, now=None):
+    """Approximate the current FSRS retrievability from the stored card state."""
+    if card.state != "review" or not card.last_review_at or card.stability <= 0:
+        return 0.0
+    now = now or datetime.utcnow()
+    elapsed_days = max(0.0, (now - card.last_review_at).total_seconds() / 86400.0)
+    return 0.9 ** (elapsed_days / max(float(card.stability), 1e-6))
+
+
+@study_plan_api.get("/study/overview")
+@login_required
+def study_overview(user):
+    word_ids = selected_word_ids(user)
+    total = len(word_ids)
+    cards = UserWordCard.query.filter(
+        UserWordCard.user_id == user.id,
+        UserWordCard.word_id.in_(word_ids),
+    ).all() if word_ids else []
+
+    learned_ids = {card.word_id for card in cards if card.first_learned_at is not None or card.review_count > 0}
+    reviewed_ids = {card.word_id for card in cards if card.review_count > 1}
+    mastered_ids = {
+        card.word_id
+        for card in cards
+        if card.state == "review"
+        and card.stability >= 1.5
+        and card_retrievability(card) >= 0.9
+        and card.review_count >= 2
+    }
+
+    learned = len(learned_ids)
+    reviewed = len(reviewed_ids)
+    mastered = len(mastered_ids)
+    remaining = max(0, total - learned)
+    progress = round((learned / total) * 100, 1) if total else 0.0
+
+    return jsonify({
+        "totalWords": total,
+        "learnedWords": learned,
+        "reviewedWords": reviewed,
+        "masteredWords": mastered,
+        "remainingWords": remaining,
+        "progressPercent": progress,
+    })
 
 
 @study_plan_api.get("/study/today/progress")
@@ -106,9 +153,11 @@ def study_time(user):
     total_seconds = sum(int(value or 0) for value in db.session.query(db.func.sum(StudySession.duration_seconds)).filter(StudySession.user_id == user.id).all())
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     if active:
-        today_seconds += max(0, int((datetime.utcnow() - active.started_at).total_seconds()))
+        elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds()))
+        today_seconds += elapsed
+        total_seconds += elapsed
     return jsonify({
         "todaySeconds": today_seconds,
-        "totalSeconds": total_seconds + (max(0, int((datetime.utcnow() - active.started_at).total_seconds())) if active else 0),
+        "totalSeconds": total_seconds,
         "activeSessionId": active.id if active else None,
     })
