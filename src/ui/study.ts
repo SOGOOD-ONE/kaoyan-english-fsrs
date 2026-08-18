@@ -3,13 +3,12 @@ import { apiRequest } from "../services/api";
 import { Rating, review } from "../fsrs/adapter";
 import type { Grade } from "../fsrs/adapter";
 import { store } from "../db/db";
-import { syncStudyData, uploadReview } from "../services/sync";
+import { syncStudyData, submitReviewToServer } from "../services/sync";
 
 type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
-type Today = { review: ServerCard[]; newUnlocked: boolean; mandatoryRemaining: number; mandatoryCompleted: number; mandatoryTotal: number };
-type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
+type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number; newCompleted: number };
 type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; completed: number; words: ServerWord[] };
 type ReviewQueue = { quota: number; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
 type Item = { word: ServerWord; card?: ServerCard };
@@ -25,9 +24,7 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
 
   if (mode === "new") {
     const queue = await apiRequest<NewQueue>("/study/new-queue");
-    if (!queue.newUnlocked) {
-      throw new Error(`今天还有 ${queue.mandatoryRemaining} 项必做复习，请先完成复习。`);
-    }
+    if (!queue.newUnlocked) throw new Error(`今天还有 ${queue.mandatoryRemaining} 项必做复习，请先完成复习。`);
     return { items: queue.words.map(word => ({ word })), total: queue.words.length };
   }
   if (mode === "mandatory") {
@@ -99,7 +96,17 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           const saved = reviewRows.find(row => row.id === result.reviewId);
           if (!saved) throw new Error("学习记录保存失败，请重试");
           saved.reviewType = reviewType;
-          await uploadReview(saved);
+
+          const server = await submitReviewToServer(saved);
+          await store.markReviewSynced(saved.id);
+          await syncStudyData();
+
+          if (reviewType === "mandatory" && server.today.mandatoryRemaining > 0) {
+            // The authoritative server queue is reloaded on the next render/entry.
+          }
+          if (reviewType === "new" && server.today.newCompleted >= server.today.newQuota) {
+            index = total - 1;
+          }
 
           index += 1;
           answerVisible = false;
