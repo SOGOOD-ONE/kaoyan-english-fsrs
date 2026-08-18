@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
 const base = "https://raw.githubusercontent.com/SOGOOD-ONE/kaoyan-core-vocab/main";
-const files = ["index.html", "data.js", "sentences.js"];
+const files = ["data.js", "sentences.js"];
 
 await mkdir("public", { recursive: true });
 
@@ -17,16 +17,15 @@ try {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
-      if (name === "index.html") await writeFile(name, text, "utf8");
-      else await writeFile(`public/${name}`, text, "utf8");
+      await writeFile(`public/${name}`, text, "utf8");
     }
-    console.log("Synced original kaoyan-core-vocab page and its data files");
+    console.log("Synced optional vocabulary support files");
   } finally {
     clearTimeout(timeout);
   }
 } catch (error) {
   console.warn(
-    `Vocab sync skipped: ${error instanceof Error ? error.message : String(error)}`
+    `Vocab support sync skipped: ${error instanceof Error ? error.message : String(error)}`
   );
-  console.warn("Continuing build with the vocabulary files already present locally.");
+  console.warn("Continuing build without replacing the application entry.");
 }
