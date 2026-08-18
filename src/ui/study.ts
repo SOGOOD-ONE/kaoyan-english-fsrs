@@ -9,7 +9,7 @@ type Mode = "new" | "mandatory" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
 type ServerCard = { id: string; wordId: string; state: string; stability: number; difficulty: number; dueAt: string; firstLearnedAt?: string | null; lastReviewAt?: string | null; correctCount: number; wrongCount: number; reviewCount: number };
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number; newCompleted: number };
-type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; completed: number; words: ServerWord[] };
+type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; effectiveQuota?: number; completed: number; words: ServerWord[] };
 type ReviewQueue = { quota: number; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
 type SelfQueue = { total: number; words: Array<ServerWord & { card: ServerCard }> };
 type Item = { word: ServerWord; card?: ServerCard };
@@ -89,12 +89,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
     const handlePageHide = () => { void stopSession(session.sessionId); };
     window.addEventListener("pagehide", handlePageHide, { once: true });
 
-    const bindReveal = () => document.getElementById("study-reveal")?.addEventListener("click", () => {
-      answerVisible = !answerVisible;
-      updateStudyCard(root, items[index], index, total, answerVisible);
-      bindRatings();
-    });
-
     const bindRatings = () => root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
       if (button.disabled) return;
       button.disabled = true;
@@ -120,7 +114,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           return;
         }
         updateStudyCard(root, items[index], index, total, false);
-        bindReveal();
         bindRatings();
         void server;
       } catch (error) {
@@ -130,7 +123,11 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
     }));
 
     renderStudyShell(root, mode, items[index], index, total, answerVisible);
-    bindReveal();
+    document.getElementById("study-reveal")?.addEventListener("click", () => {
+      answerVisible = !answerVisible;
+      updateStudyCard(root, items[index], index, total, answerVisible);
+      bindRatings();
+    });
     bindRatings();
   } catch (error) {
     root.innerHTML = `<main class="study-page"><section class="study-error"><h2>学习内容加载失败</h2><p>${escapeHtml(error instanceof Error ? error.message : "请刷新页面后重试")}</p><a href="/">返回首页</a></section></main>`;
