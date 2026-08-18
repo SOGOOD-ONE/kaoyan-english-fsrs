@@ -13,7 +13,7 @@ type NewCard = { id?: string; wordId?: string; newEcCorrect: number; newCeCorrec
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number; newCompleted: number };
 type NewQueueWord = ServerWord & { card: NewCard };
 type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; effectiveQuota?: number; available?: number; completed: number; words: NewQueueWord[] };
-type ReviewQueue = { quota: number; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
+type ReviewQueue = { quota: number | null; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
 type SelfQueue = { total: number; words: Array<ServerWord & { card: ServerCard }> };
 type Item = { word: ServerWord; card?: ServerCard };
 
@@ -26,7 +26,10 @@ function newDirection(card: NewCard): Direction { return card.newEcCorrect >= 2 
 function buildNewOptions(items: NewQueueWord[], current: NewQueueWord, direction: Direction) {
   const correct = direction === "ec" ? current.meaning : current.word;
   const pool = items.filter(item => item.id !== current.id).map(item => direction === "ec" ? item.meaning : item.word).filter(value => value && value !== correct);
-  return shuffle([correct, ...shuffle([...new Set(pool)]).slice(0, 3)]);
+  const unique = [...new Set(pool)];
+  const options = [correct, ...shuffle(unique).slice(0, 3)];
+  while (options.length < 4) options.push(correct);
+  return shuffle(options.slice(0, 4));
 }
 
 async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
@@ -47,10 +50,10 @@ async function stopSession(sessionId: string) {
 }
 
 function renderStudyShell(root: HTMLElement, mode: Mode, item: Item | undefined, index: number, total: number, answerVisible: boolean) {
-  const title = mode === "mandatory" ? "今日复习" : "自主复习";
-  const desc = mode === "mandatory" ? "完成今天必须完成的复习" : "可以自由复习已经学习过的单词";
+  const title = mode === "mandatory" ? "复习昨日新词" : "自主复习";
+  const desc = mode === "mandatory" ? "完成昨日新词复习后继续学习" : "根据 FSRS 推荐当前最需要复习的单词";
   const percent = total ? Math.min(100, Math.round((index / total) * 100)) : 100;
-  root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2 id="study-word">${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button><button class="study-known-button" data-action="known">认识，划掉</button><div id="study-answer-slot">${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-action="rating" data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-action="rating" data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-action="rating" data-rating="3"><strong>认识</strong><small>Good</small></button><button data-action="rating" data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</div></section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 <span>${Math.min(index, total)}</span> 个 · 本次进度会同步到你的账号</div></main>`;
+  root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2 id="study-word">${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button><div id="study-answer-slot">${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-action="rating" data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-action="rating" data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-action="rating" data-rating="3"><strong>认识</strong><small>Good</small></button><button data-action="rating" data-rating="4"><strong>很熟</strong><small>Easy</small></button></div><button class="study-known-button" data-action="known">斩</button>` : ""}</div></section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 <span>${Math.min(index, total)}</span> 个 · 本次进度会同步到你的账号</div></main>`;
 }
 
 export async function mountStudy(root: HTMLElement, mode: Mode) {
@@ -61,11 +64,11 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
 
     if (mode === "new") {
       if (reviewRemaining > 0) {
-        root.innerHTML = `<main class="study-page"><section class="study-complete"><div class="study-complete-kicker">今日学习顺序</div><h2>请先完成今日复习</h2><p>还有 ${reviewRemaining} 项必做复习未完成。完成后才能开始学习新词。</p><a href="/study/review" class="study-home-btn">开始复习</a></section></main>`;
+        root.innerHTML = `<main class="study-page"><section class="study-complete"><div class="study-complete-kicker">今日学习顺序</div><h2>请先完成昨日新词复习</h2><p>还有 ${reviewRemaining} 个昨日新词需要复习。</p><a href="/study/review" class="study-home-btn">开始复习</a></section></main>`;
         return;
       }
       const queue = await apiRequest<NewQueue>("/study/new-queue");
-      if (!queue.newUnlocked) throw new Error(`今天还有 ${queue.mandatoryRemaining} 项必做复习，请先完成复习。`);
+      if (!queue.newUnlocked) throw new Error(`今天还有 ${queue.mandatoryRemaining} 个昨日新词需要复习。`);
       const words = queue.words;
       const total = words.length;
       if (!total) {
@@ -83,11 +86,9 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
         const card = current.card || { newEcCorrect: 0, newCeCorrect: 0, knownExcluded: false, newComplete: false };
         const direction = newDirection(card);
         const options = buildNewOptions(words, current, direction);
-        const question = direction === "ec" ? "这个单词的中文意思是？" : "下面哪个英文单词对应这个中文？";
         const prompt = direction === "ec" ? current.word : current.meaning;
-        const correctStage = card.newEcCorrect + card.newCeCorrect;
         const percent = Math.min(100, Math.round((index / total) * 100));
-        root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>学习新词</h1><p>2 次英译汉 + 1 次汉译英，正确完成 3 次后才进入 FSRS</p></div><div class="study-session-count">${index + 1} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div><section class="study-word-panel new-learning-panel"><div class="study-word-meta">${escapeHtml(current.category || "核心词")} ${current.type ? `· ${escapeHtml(current.type)}` : ""}</div><div class="new-learning-stage">${correctStage}/3 · ${direction === "ec" ? "英 → 汉" : "汉 → 英"}</div><h2 class="new-learning-question">${escapeHtml(question)}</h2><div class="new-learning-prompt">${escapeHtml(prompt)}</div><div class="new-learning-options">${options.map(option => `<button class="new-learning-option" data-action="new-answer" data-option="${encodeURIComponent(option)}">${escapeHtml(option)}</button>`).join("")}</div><button class="study-known-button" data-action="known">认识，划掉</button>${message ? `<div class="new-learning-message">${escapeHtml(message)}</div>` : ""}</section><div class="study-footnote">今日已完成 ${queue.completed} 个 · 当前单词进度 ${correctStage}/3</div></main>`;
+        root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>学习新词</h1></div><div class="study-session-count">${index + 1} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div><section class="study-word-panel new-learning-panel"><div class="study-word-meta">${escapeHtml(current.category || "核心词")} ${current.type ? `· ${escapeHtml(current.type)}` : ""}</div><div class="new-learning-prompt">${escapeHtml(prompt)}</div><div class="new-learning-options">${options.map(option => `<button class="new-learning-option" data-action="new-answer" data-option="${encodeURIComponent(option)}">${escapeHtml(option)}</button>`).join("")}</div><button class="study-known-button" data-action="known">斩</button>${message ? `<div class="new-learning-message">${escapeHtml(message)}</div>` : ""}</section><div class="study-footnote">今日已完成 ${queue.completed} 个</div></main>`;
       };
       renderNew();
 
@@ -105,7 +106,7 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
               window.removeEventListener("pagehide", handlePageHide);
               root.innerHTML = `<main class="study-page"><section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>新词学习完成</h2><p>本次处理 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section></main>`;
             } else renderNew();
-          } catch { renderNew("暂时无法保存“认识”，请重试。"); }
+          } catch { renderNew("暂时无法保存，请重试。"); }
           return;
         }
         if (action === "new-answer") {
@@ -117,14 +118,8 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           try {
             const result = await apiRequest<{ completed: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: current.id, direction, correct }) });
             current.card = result.card;
-            if (!correct) {
-              renderNew("再试一次");
-              return;
-            }
-            if (!result.completed) {
-              renderNew();
-              return;
-            }
+            if (!correct) { renderNew("再试一次"); return; }
+            if (!result.completed) { renderNew(); return; }
             const fsrsResult = await review(current, Rating.Good as Grade);
             const reviewRows = await store.getReviews(current.id);
             const saved = reviewRows.find(row => row.id === fsrsResult.reviewId);
@@ -168,7 +163,7 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
             window.removeEventListener("pagehide", handlePageHide);
             renderStudyShell(root, mode, undefined, total, total, false);
           } else { answerVisible = false; render(); }
-        } catch { window.alert("无法保存“认识”，请重试"); }
+        } catch { window.alert("无法保存，请重试"); }
         return;
       }
       if (target.closest("#study-reveal")) { answerVisible = !answerVisible; render(); return; }
