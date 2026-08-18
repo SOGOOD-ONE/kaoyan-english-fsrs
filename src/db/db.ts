@@ -44,5 +44,6 @@ export const store = {
   async getPendingReviews() { const reviews = await (await db()).getAll("reviews"); return reviews.filter(review => !review.syncedAt).sort((a, b) => a.reviewedAt - b.reviewedAt); },
   async markReviewSynced(id: string) { const database = await db(); const review = await database.get("reviews", id); if (!review) return; review.syncedAt = Date.now(); await database.put("reviews", review); },
   async clearCards() { const database = await db(); const tx = database.transaction("cards", "readwrite"); await tx.store.clear(); await tx.done; },
-  async clearReviews() { const database = await db(); const tx = database.transaction("reviews", "readwrite"); await tx.store.clear(); await tx.done; }
+  async clearReviews() { const database = await db(); const tx = database.transaction("reviews", "readwrite"); await tx.store.clear(); await tx.done; },
+  async clearStudyState() { await this.clearCards(); await this.clearReviews(); }
 };
