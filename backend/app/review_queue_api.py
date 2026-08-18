@@ -1,10 +1,10 @@
-from datetime import date, datetime
+from datetime import datetime
 
 from flask import Blueprint, jsonify
 
-from . import db
 from .api import login_required, selected_word_ids
 from .models import DailyPlan, UserSetting, UserWordCard, Word
+from .time_utils import local_today
 
 review_queue_api = Blueprint("review_queue_api", __name__)
 
@@ -28,7 +28,7 @@ def card_json(card):
 @review_queue_api.get("/study/review-queue")
 @login_required
 def review_queue(user):
-    today = date.today()
+    today = local_today(user)
     settings = UserSetting.query.filter_by(user_id=user.id).first()
     quota = int(settings.daily_review_quota if settings else 100)
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
