@@ -12,13 +12,13 @@ export async function mountVocabularies(root: HTMLElement) {
 
 async function renderList(container: HTMLElement) {
   try {
-    const [vocabularies, selections] = await Promise.all([
+    const [vocabularies, selections, statsMap] = await Promise.all([
       apiRequest<Vocabulary[]>("/vocabularies"),
       apiRequest<Selection[]>("/vocabularies/selections"),
+      apiRequest<Record<string, Stats>>("/vocabularies/stats").catch(() => ({})),
     ]);
     const selected = new Map(selections.map(item => [item.vocabularyId, item]));
-    const stats = await Promise.all(vocabularies.map(v => apiRequest<Stats>(`/vocabularies/${v.id}/stats`).catch(() => ({ wordCount: 0, learned: 0, due: 0, new: 0, masteryRate: 0 }))));
-    container.innerHTML = `<div class="vocab-page-head"><div><strong>词库</strong><span>${vocabularies.length} 个可用词库</span></div><label class="button">导入词表<input id="vocab-import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div><div class="vocab-page-list">${vocabularies.map((v, i) => { const s = stats[i]; const enabled = selected.get(v.id)?.enabled ?? false; return `<article class="vocab-page-item"><div class="vocab-page-main"><label><input type="checkbox" data-select="${v.id}" ${enabled ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><p>${escapeHtml(v.description || "系统词库")}</p><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>${s.wordCount} 词 · 已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><div class="vocab-page-rate">${s.masteryRate}%</div></article>`; }).join("") || `<div class="empty"><h2>还没有词库</h2><p>导入第一份词表开始学习。</p></div>`}</div>`;
+    container.innerHTML = `<div class="vocab-page-head"><div><strong>词库</strong><span>${vocabularies.length} 个可用词库</span></div><label class="button">导入词表<input id="vocab-import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div><div class="vocab-page-list">${vocabularies.map(v => { const s = statsMap[v.id] || { wordCount: 0, learned: 0, due: 0, new: 0, masteryRate: 0 }; const enabled = selected.get(v.id)?.enabled ?? false; return `<article class="vocab-page-item"><div class="vocab-page-main"><label><input type="checkbox" data-select="${v.id}" ${enabled ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><p>${escapeHtml(v.description || "系统词库")}</p><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>${s.wordCount} 词 · 已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><div class="vocab-page-rate">${s.masteryRate}%</div></article>`; }).join("") || `<div class="empty"><h2>还没有词库</h2><p>导入第一份词表开始学习。</p></div>`}</div>`;
     container.querySelectorAll<HTMLInputElement>("[data-select]").forEach(input => input.addEventListener("change", async () => { try { await apiRequest(`/vocabularies/${input.dataset.select}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await renderList(container); } catch { input.checked = !input.checked; } }));
     container.querySelector<HTMLInputElement>("#vocab-import")?.addEventListener("change", async e => {
       const input = e.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return;
