@@ -1,12 +1,12 @@
 from datetime import datetime
 
 from flask import Blueprint, jsonify
-from sqlalchemy import func, distinct
-
 from . import db
 from .api import login_required, selected_word_ids
+from .history import build_history
 from .models import ReviewLog, StudySession, UserWordCard
 from .study_plan_api import card_retrievability, get_or_create_plan
+from .time_utils import local_day_start_utc
 
 
 dashboard_api = Blueprint("dashboard_api", __name__)
@@ -26,9 +26,8 @@ def build_overview(user):
         UserWordCard.word_id.in_(word_ids),
     ).all()
 
-    # Count reviews in SQL instead of loading every ReviewLog row into Python.
     review_counts = dict(
-        db.session.query(ReviewLog.word_id, func.count(ReviewLog.id))
+        db.session.query(ReviewLog.word_id, db.func.count(ReviewLog.id))
         .filter(
             ReviewLog.user_id == user.id,
             ReviewLog.word_id.in_(word_ids),
@@ -77,10 +76,8 @@ def dashboard_summary(user):
     overview = build_overview(user)
     plan = get_or_create_plan(user)
     now = datetime.utcnow()
-    active = StudySession.query.filter_by(
-        user_id=user.id, ended_at=None
-    ).order_by(StudySession.started_at.desc()).first()
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
+    start_of_day = local_day_start_utc(user, plan.plan_date)
     sessions = StudySession.query.filter(
         StudySession.user_id == user.id,
         StudySession.started_at >= start_of_day,
@@ -96,10 +93,7 @@ def dashboard_summary(user):
         today_seconds += elapsed
         total_seconds += elapsed
 
-    active_days = db.session.query(
-        func.count(distinct(func.date(ReviewLog.reviewed_at)))
-    ).filter(ReviewLog.user_id == user.id).scalar() or 0
-
+    history = build_history(user.id, 3650)
     mandatory_completed = min(plan.mandatory_completed, plan.mandatory_total)
     review_remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
     return jsonify({
@@ -118,5 +112,5 @@ def dashboard_summary(user):
             "newCompleted": plan.new_completed,
             "reviewRemaining": review_remaining,
         },
-        "activeDays": int(active_days),
+        "activeDays": history["activeDays"],
     })
