@@ -44,11 +44,11 @@ export async function mountDashboard(root: HTMLElement) {
           </section>
           <section class="dashboard-time-grid"><div class="dashboard-time-card"><span>今日学习时长</span><strong>${formatDuration(time.todaySeconds)}</strong></div><div class="dashboard-time-card"><span>总学习时长</span><strong>${formatDuration(time.totalSeconds)}</strong></div><div class="dashboard-time-card"><span>活跃天数</span><strong>${activeDays}</strong></div></section>
           <section class="dashboard-actions">
-            <a class="study-action review-required" href="/study/review"><span class="study-action-title">复习昨日新词</span><span class="study-action-arrow">→</span></a>
+            <a class="study-action review-required" href="/study/review"><span class="study-action-title">复习昨日新词</span></a>
             ${reviewRequired || newRemaining === 0
-              ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-arrow">${reviewRequired ? "🔒" : "✓"}</span></div>`
-              : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span><span class="study-action-arrow">→</span></a>`}
-            <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span><span class="study-action-arrow">→</span></a>
+              ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-status">${reviewRequired ? "🔒" : "✓"}</span></div>`
+              : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span></a>`}
+            <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span></a>
           </section>
         </main>
       </div>`;
