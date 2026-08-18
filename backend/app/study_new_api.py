@@ -99,13 +99,18 @@ def answer_new_word(user):
     return jsonify({"ok": True, "correct": correct, "expectedDirection": "ce" if card.new_ec_correct >= 2 else "ec", "completed": completed, "card": card_json(card)})
 
 
-@study_new_api.post("/study/new-known")
+@study_new_api.post("/study/known-exclude")
 @login_required
-def mark_new_known(user):
+def mark_known_excluded(user):
     data = request.get_json(silent=True) or {}
     word_id = str(data.get("wordId", ""))
+    mode = str(data.get("mode", "new"))
+    if mode not in {"new", "mandatory", "self"}:
+        return jsonify({"error": "invalid_mode"}), 400
     if not word_id or not Word.query.filter_by(id=word_id).first():
         return jsonify({"error": "word_not_found"}), 404
+    if word_id not in selected_word_ids(user):
+        return jsonify({"error": "word_not_in_selected_vocabulary"}), 409
     card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
     if not card:
         card = UserWordCard(user_id=user.id, word_id=word_id, state="new", due_at=datetime.utcnow())
@@ -113,5 +118,23 @@ def mark_new_known(user):
     card.known_excluded = True
     card.new_ec_correct = 0
     card.new_ce_correct = 0
+    today = local_today(user)
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
+    if plan:
+        if mode == "new":
+            plan.new_completed = min(plan.new_quota, plan.new_completed + 1)
+        elif mode == "mandatory":
+            plan.mandatory_completed = min(plan.mandatory_total, plan.mandatory_completed + 1)
+        else:
+            plan.self_completed += 1
     db.session.commit()
-    return jsonify({"ok": True, "wordId": word_id, "knownExcluded": True})
+    return jsonify({"ok": True, "wordId": word_id, "knownExcluded": True, "mode": mode})
+
+
+@study_new_api.post("/study/new-known")
+@login_required
+def mark_new_known_compat(user):
+    data = request.get_json(silent=True) or {}
+    data["mode"] = "new"
+    request._cached_json = (data, data)
+    return mark_known_excluded(user)
