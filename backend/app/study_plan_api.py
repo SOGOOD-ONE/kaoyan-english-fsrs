@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from . import db
 from .api import login_required, selected_word_ids
 from .models import DailyPlan, StudySession, UserSetting, UserWordCard, ReviewLog
-from .time_utils import local_today, local_day_start_utc, user_timezone
+from .time_utils import local_today, local_day_start_utc, local_day_end_utc, mandatory_source_date
 
 study_plan_api = Blueprint("study_plan_api", __name__)
 
@@ -16,6 +16,7 @@ def today_due_cards(user):
         UserWordCard.user_id == user.id,
         UserWordCard.due_at <= datetime.utcnow(),
         UserWordCard.state != "new",
+        UserWordCard.known_excluded.is_(False),
     )
     if selected_ids:
         query = query.filter(UserWordCard.word_id.in_(selected_ids))
@@ -24,23 +25,64 @@ def today_due_cards(user):
     return query.order_by(UserWordCard.due_at.asc()).all()
 
 
+def mandatory_word_ids(user, source_date=None):
+    source_date = source_date or mandatory_source_date(user)
+    start = local_day_start_utc(user, source_date)
+    end = local_day_end_utc(user, source_date)
+    rows = ReviewLog.query.filter(
+        ReviewLog.user_id == user.id,
+        ReviewLog.review_type == "new",
+        ReviewLog.reviewed_at >= start,
+        ReviewLog.reviewed_at <= end,
+    ).all()
+    ids = {row.word_id for row in rows}
+    if not ids:
+        return set(), source_date
+    excluded = {
+        row.word_id for row in UserWordCard.query.filter(
+            UserWordCard.user_id == user.id,
+            UserWordCard.word_id.in_(ids),
+            UserWordCard.known_excluded.is_(True),
+        ).all()
+    }
+    return ids - excluded, source_date
+
+
 def get_or_create_plan(user):
     today = local_today(user)
+    source_date = mandatory_source_date(user)
     settings = UserSetting.query.filter_by(user_id=user.id).first()
-    quota = settings.daily_new_quota if settings else 100
-    review_quota = settings.daily_review_quota if settings else 100
+    new_quota = settings.daily_new_quota if settings else 100
+    self_quota = settings.daily_review_quota if settings else 100
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
+    source_ids, source_date = mandatory_word_ids(user, source_date)
+    source_total = len(source_ids)
     if not plan:
-        due = today_due_cards(user)
-        plan = DailyPlan(user_id=user.id, plan_date=today, new_quota=quota, mandatory_total=min(len(due), review_quota), mandatory_completed=0)
+        plan = DailyPlan(
+            user_id=user.id,
+            plan_date=today,
+            new_quota=new_quota,
+            mandatory_total=source_total,
+            mandatory_completed=0,
+            mandatory_source_date=source_date,
+            self_total=self_quota,
+            self_completed=0,
+        )
         db.session.add(plan)
         db.session.commit()
-    elif plan.mandatory_completed == 0:
-        due_count = len(today_due_cards(user))
-        expected_total = min(due_count, review_quota)
-        if expected_total != plan.mandatory_total:
-            plan.mandatory_total = expected_total
-            db.session.commit()
+    elif plan.mandatory_source_date != source_date:
+        plan.mandatory_source_date = source_date
+        plan.mandatory_total = source_total
+        plan.mandatory_completed = 0
+        plan.self_total = self_quota
+        plan.self_completed = 0
+        plan.new_quota = new_quota
+        db.session.commit()
+    else:
+        plan.mandatory_total = source_total
+        plan.new_quota = new_quota
+        plan.self_total = self_quota
+        db.session.commit()
     return plan
 
 
@@ -69,17 +111,18 @@ def study_overview(user):
     card_by_word = {card.word_id: card for card in cards}
     learned_ids = {word_id for word_id, count in reviews_by_word.items() if count > 0}
     learned_ids.update(card.word_id for card in cards if card.first_learned_at is not None)
+    learned_ids = {word_id for word_id in learned_ids if not card_by_word.get(word_id, None) or not card_by_word[word_id].known_excluded}
     reviewed_ids = {word_id for word_id, count in reviews_by_word.items() if count >= 2}
-    reviewed_ids.update(card.word_id for card in cards if card.review_count >= 2)
+    reviewed_ids.update(card.word_id for card in cards if card.review_count >= 2 and not card.known_excluded)
 
     mastered_ids = set()
     for word_id in reviewed_ids:
         card = card_by_word.get(word_id)
-        if card and card.state == "review" and card.review_count >= 2 and card.stability >= 1.5 and card_retrievability(card) >= 0.9 and card.correct_count >= card.wrong_count:
+        if card and not card.known_excluded and card.state == "review" and card.review_count >= 2 and card.stability >= 1.5 and card_retrievability(card) >= 0.9 and card.correct_count >= card.wrong_count:
             mastered_ids.add(word_id)
 
     learned, reviewed, mastered = len(learned_ids), len(reviewed_ids), len(mastered_ids)
-    remaining = max(0, total - learned)
+    remaining = max(0, total - learned - len({c.word_id for c in cards if c.known_excluded}))
     return jsonify({"totalWords": total, "learnedWords": learned, "reviewedWords": reviewed, "masteredWords": mastered, "remainingWords": remaining, "progressPercent": round((learned / total) * 100, 1) if total else 0.0})
 
 
@@ -88,7 +131,18 @@ def study_overview(user):
 def get_today_progress(user):
     plan = get_or_create_plan(user)
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    return jsonify({"date": plan.plan_date.isoformat(), "newQuota": plan.new_quota, "newCompleted": plan.new_completed, "mandatoryTotal": plan.mandatory_total, "mandatoryCompleted": min(plan.mandatory_completed, plan.mandatory_total), "selfTotal": plan.self_total, "selfCompleted": plan.self_completed, "activeSessionId": active.id if active else None, "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed)})
+    return jsonify({
+        "date": plan.plan_date.isoformat(),
+        "newQuota": plan.new_quota,
+        "newCompleted": plan.new_completed,
+        "mandatoryTotal": plan.mandatory_total,
+        "mandatoryCompleted": min(plan.mandatory_completed, plan.mandatory_total),
+        "mandatorySourceDate": plan.mandatory_source_date.isoformat() if plan.mandatory_source_date else None,
+        "selfTotal": plan.self_total,
+        "selfCompleted": plan.self_completed,
+        "activeSessionId": active.id if active else None,
+        "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed),
+    })
 
 
 @study_plan_api.post("/study/today/progress")
@@ -103,6 +157,10 @@ def record_today_progress(user):
     setattr(plan, field, int(getattr(plan, field) or 0) + 1)
     if mode == "mandatory":
         plan.mandatory_completed = min(plan.mandatory_completed, plan.mandatory_total)
+    if mode == "self":
+        settings = UserSetting.query.filter_by(user_id=user.id).first()
+        plan.self_total = settings.daily_review_quota if settings else plan.self_total
+        plan.self_completed = min(plan.self_completed, plan.self_total)
     db.session.commit()
     return jsonify({"ok": True, "mode": mode, "completed": getattr(plan, field), "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed)})
 
