@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from flask import Blueprint, jsonify
 
 from . import db
@@ -37,8 +35,16 @@ def study_new_queue(user):
         return jsonify({"date": today.isoformat(), "newUnlocked": True, "mandatoryRemaining": 0, "quota": settings.daily_new_quota, "completed": completed, "words": []})
 
     selected_ids = selected_word_ids(user)
-    active_ids = {row.word_id for row in UserWordCard.query.filter_by(user_id=user.id).all()}
-    candidate_ids = selected_ids - active_ids - served_ids
+    # A card that merely exists in the database is not necessarily a learned word.
+    # Keep cards with no reviews and no first_learned_at in the new-word queue.
+    learned_ids = {
+        row.word_id
+        for row in UserWordCard.query.filter(
+            UserWordCard.user_id == user.id,
+            (UserWordCard.review_count > 0) | (UserWordCard.first_learned_at.isnot(None)),
+        ).all()
+    }
+    candidate_ids = selected_ids - learned_ids - served_ids
     query = Word.query.filter(Word.id.in_(candidate_ids)) if candidate_ids else Word.query.filter(False)
     candidates = query.all()
     candidates.sort(key=lambda word: (-CATEGORY_WEIGHT.get(word.category, 50), word.created_at, word.id))
