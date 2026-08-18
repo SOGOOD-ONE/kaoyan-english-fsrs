@@ -53,24 +53,30 @@ export async function mountSettings(root: HTMLElement) {
   document.getElementById("save-settings")?.addEventListener("click", async () => {
     const status = document.getElementById("save-status")!;
     status.textContent = "保存中…";
+    const button = document.getElementById("save-settings") as HTMLButtonElement | null;
+    if (button) button.disabled = true;
     try {
-      await apiRequest<Settings>("/settings", {
-        method: "PUT",
-        body: JSON.stringify({
-          dailyNewQuota: Number(newQuotaSelect.value),
-          timezone: timezone.value,
-          soundEnabled: (document.getElementById("sound-enabled") as HTMLInputElement).checked,
-          autoPlayExample: (document.getElementById("auto-play-example") as HTMLInputElement).checked,
+      await Promise.all([
+        apiRequest<Settings>("/settings", {
+          method: "PUT",
+          body: JSON.stringify({
+            dailyNewQuota: Number(newQuotaSelect.value),
+            timezone: timezone.value,
+            soundEnabled: (document.getElementById("sound-enabled") as HTMLInputElement).checked,
+            autoPlayExample: (document.getElementById("auto-play-example") as HTMLInputElement).checked,
+          }),
         }),
-      });
-      await apiRequest<ReviewQuota>("/settings/review-quota", {
-        method: "PUT",
-        body: JSON.stringify({ dailyReviewQuota: Number(reviewQuotaSelect.value) }),
-      });
+        apiRequest<ReviewQuota>("/settings/review-quota", {
+          method: "PUT",
+          body: JSON.stringify({ dailyReviewQuota: Number(reviewQuotaSelect.value) }),
+        }),
+      ]);
       status.textContent = "已保存";
       window.setTimeout(() => { status.textContent = ""; }, 1500);
     } catch {
       status.textContent = "保存失败，请检查网络连接";
+    } finally {
+      if (button) button.disabled = false;
     }
   });
 
