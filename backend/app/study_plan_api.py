@@ -106,10 +106,16 @@ def start_study_session(user):
     mode = str(data.get("mode", "new"))
     if mode not in {"new", "mandatory", "self"}:
         return jsonify({"error": "invalid_mode"}), 400
-    active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    if active:
-        return jsonify({"sessionId": active.id, "startedAt": active.started_at.isoformat(), "mode": active.mode})
-    session = StudySession(user_id=user.id, mode=mode, started_at=datetime.utcnow())
+
+    now = datetime.utcnow()
+    active_sessions = StudySession.query.filter_by(user_id=user.id, ended_at=None).all()
+    # A browser refresh, another device, or a previous tab can leave an old session open.
+    # Close all existing active sessions before creating the new authoritative session.
+    for active in active_sessions:
+        active.ended_at = now
+        active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
+
+    session = StudySession(user_id=user.id, mode=mode, started_at=now)
     db.session.add(session)
     db.session.commit()
     return jsonify({"sessionId": session.id, "startedAt": session.started_at.isoformat(), "mode": session.mode})
