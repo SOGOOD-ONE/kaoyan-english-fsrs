@@ -23,6 +23,7 @@ class UserSetting(db.Model):
     __tablename__ = 'user_settings'
     user_id = db.Column(db.String(36), db.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
     daily_new_quota = db.Column(db.Integer, nullable=False, default=100)
+    daily_review_quota = db.Column(db.Integer, nullable=False, default=100)
     timezone = db.Column(db.String(64), nullable=False, default='Asia/Shanghai')
     sound_enabled = db.Column(db.Boolean, nullable=False, default=True)
     auto_play_example = db.Column(db.Boolean, nullable=False, default=False)
