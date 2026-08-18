@@ -2,7 +2,7 @@ import { apiRequest } from "../services/api";
 import { renderNav } from "./nav";
 import { store } from "../db/db";
 
-type Settings = { dailyNewQuota: number; timezone: string; soundEnabled: boolean; autoPlayExample: boolean };
+type Settings = { dailyNewQuota: number; soundEnabled: boolean; autoPlayExample: boolean };
 type ReviewQuota = { dailyReviewQuota: number };
 const QUOTAS = [50, 100, 150, 200, 250, 300];
 
@@ -30,7 +30,7 @@ export async function mountSettings(root: HTMLElement) {
       <label class="setting-row"><div><strong>每日新词</strong><small>每天学习 ${newQuota} 个新词，预计约 ${estimateMinutes(newQuota)} 分钟</small></div><select id="daily-new-quota">${QUOTAS.map(v => `<option value="${v}" ${newQuota === v ? "selected" : ""}>${v} 个</option>`).join("")}</select></label>
       <label class="setting-row"><div><strong>自主复习数量</strong><small>每天由 FSRS 从已学单词中推荐 ${dailyReviewQuota} 个；06:00 的昨日新词强制复习不受此数量限制</small></div><select id="daily-review-quota">${QUOTAS.map(v => `<option value="${v}" ${dailyReviewQuota === v ? "selected" : ""}>${v} 个</option>`).join("")}</select></label>
       <div class="settings-plan-note" id="quota-note">预计今日新词学习时间：约 ${estimateMinutes(newQuota)} 分钟；自主复习数量：${dailyReviewQuota} 个</div>
-      <label class="setting-row"><div><strong>时区</strong><small>用于计算每日学习统计与每天 06:00 的强制复习刷新</small></div><select id="timezone"><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Singapore">Asia/Singapore</option><option value="UTC">UTC</option></select></label>
+      <div class="setting-row settings-fixed-row"><div><strong>时间标准</strong><small>所有学习日期、每日统计与 06:00 强制复习均统一使用北京时间（UTC+8）</small></div><strong class="settings-fixed-value">北京时间</strong></div>
     </section>
     <section class="panel settings-section"><div class="settings-title"><strong>学习体验</strong><span>复习过程中的交互偏好</span></div>
       <label class="setting-row"><div><strong>提示音</strong><small>完成一次评分后播放提示音</small></div><input id="sound-enabled" type="checkbox" ${settings.soundEnabled ? "checked" : ""}></label>
@@ -41,8 +41,6 @@ export async function mountSettings(root: HTMLElement) {
     </section>
     <section class="panel settings-section"><div class="settings-actions"><button id="save-settings" type="button">保存设置</button><span id="save-status"></span></div></section></main>`;
 
-  const timezone = document.getElementById("timezone") as HTMLSelectElement;
-  timezone.value = settings.timezone;
   const newQuotaSelect = document.getElementById("daily-new-quota") as HTMLSelectElement;
   const reviewQuotaSelect = document.getElementById("daily-review-quota") as HTMLSelectElement;
   const quotaNote = document.getElementById("quota-note")!;
@@ -61,7 +59,6 @@ export async function mountSettings(root: HTMLElement) {
           method: "PUT",
           body: JSON.stringify({
             dailyNewQuota: Number(newQuotaSelect.value),
-            timezone: timezone.value,
             soundEnabled: (document.getElementById("sound-enabled") as HTMLInputElement).checked,
             autoPlayExample: (document.getElementById("auto-play-example") as HTMLInputElement).checked,
           }),
