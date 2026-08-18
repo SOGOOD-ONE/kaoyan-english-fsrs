@@ -20,12 +20,14 @@ def bootstrap_vocabularies() -> None:
 
 app = create_app()
 
+debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+
 try:
     bootstrap_vocabularies()
 except Exception as exc:
     # Keep the API available even if an optional workbook is malformed.
     print(f"[vocabulary-bootstrap] skipped: {exc}")
 
+
 if __name__ == "__main__":
-    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
-app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=debug_mode)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "5000")), debug=debug_mode)
