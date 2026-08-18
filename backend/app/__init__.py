@@ -40,10 +40,24 @@ def ensure_schema_compatibility():
             db.session.commit()
 
 
+def _security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
+    secret_key = os.getenv("SECRET_KEY")
+    if not secret_key:
+        raise RuntimeError("SECRET_KEY must be configured before starting the application")
+    if len(secret_key) < 32:
+        raise RuntimeError("SECRET_KEY must be at least 32 characters long")
+
     app.config.update(
-        SECRET_KEY=os.getenv("SECRET_KEY", "dev-only-change-me"),
+        SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///kaoyan.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SESSION_COOKIE_HTTPONLY=True,
@@ -53,7 +67,10 @@ def create_app() -> Flask:
 
     db.init_app(app)
     origins = [item.strip() for item in os.getenv("FRONTEND_ORIGIN", "http://localhost:5173").split(",") if item.strip()]
+    if not origins:
+        raise RuntimeError("FRONTEND_ORIGIN must contain at least one allowed origin")
     CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
+    app.after_request(_security_headers)
 
     from .api import api
     from .vocabulary_api import vocabulary_api
