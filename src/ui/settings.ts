@@ -26,11 +26,11 @@ export async function mountSettings(root: HTMLElement) {
   const dailyReviewQuota = QUOTAS.includes(reviewQuota.dailyReviewQuota) ? reviewQuota.dailyReviewQuota : 100;
 
   root.innerHTML = `<main class="shell page settings-page"><header class="page-header"><div><h1>设置</h1><p>所有学习设置保存到你的账号，换设备后仍会保留。</p></div>${renderNav("/settings")}</header>
-    <section class="panel settings-section"><div class="settings-title"><strong>每日学习计划</strong><span>新词与复习数量在这里统一管理</span></div>
+    <section class="panel settings-section"><div class="settings-title"><strong>每日学习计划</strong><span>新词数量与自主复习数量在这里统一管理</span></div>
       <label class="setting-row"><div><strong>每日新词</strong><small>每天学习 ${newQuota} 个新词，预计约 ${estimateMinutes(newQuota)} 分钟</small></div><select id="daily-new-quota">${QUOTAS.map(v => `<option value="${v}" ${newQuota === v ? "selected" : ""}>${v} 个</option>`).join("")}</select></label>
-      <label class="setting-row"><div><strong>每日复习</strong><small>每天优先完成 ${dailyReviewQuota} 个到期单词，完成后解锁新词</small></div><select id="daily-review-quota">${QUOTAS.map(v => `<option value="${v}" ${dailyReviewQuota === v ? "selected" : ""}>${v} 个</option>`).join("")}</select></label>
-      <div class="settings-plan-note" id="quota-note">预计今日新词学习时间：约 ${estimateMinutes(newQuota)} 分钟；今日复习数量：${dailyReviewQuota} 个</div>
-      <label class="setting-row"><div><strong>时区</strong><small>用于计算每日学习统计与复习日界线</small></div><select id="timezone"><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Singapore">Asia/Singapore</option><option value="UTC">UTC</option></select></label>
+      <label class="setting-row"><div><strong>自主复习数量</strong><small>每天由 FSRS 从已学单词中推荐 ${dailyReviewQuota} 个；06:00 的昨日新词强制复习不受此数量限制</small></div><select id="daily-review-quota">${QUOTAS.map(v => `<option value="${v}" ${dailyReviewQuota === v ? "selected" : ""}>${v} 个</option>`).join("")}</select></label>
+      <div class="settings-plan-note" id="quota-note">预计今日新词学习时间：约 ${estimateMinutes(newQuota)} 分钟；自主复习数量：${dailyReviewQuota} 个</div>
+      <label class="setting-row"><div><strong>时区</strong><small>用于计算每日学习统计与每天 06:00 的强制复习刷新</small></div><select id="timezone"><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Singapore">Asia/Singapore</option><option value="UTC">UTC</option></select></label>
     </section>
     <section class="panel settings-section"><div class="settings-title"><strong>学习体验</strong><span>复习过程中的交互偏好</span></div>
       <label class="setting-row"><div><strong>提示音</strong><small>完成一次评分后播放提示音</small></div><input id="sound-enabled" type="checkbox" ${settings.soundEnabled ? "checked" : ""}></label>
@@ -46,7 +46,7 @@ export async function mountSettings(root: HTMLElement) {
   const newQuotaSelect = document.getElementById("daily-new-quota") as HTMLSelectElement;
   const reviewQuotaSelect = document.getElementById("daily-review-quota") as HTMLSelectElement;
   const quotaNote = document.getElementById("quota-note")!;
-  const refreshQuotaNote = () => { quotaNote.textContent = `预计今日新词学习时间：约 ${estimateMinutes(Number(newQuotaSelect.value))} 分钟；今日复习数量：${Number(reviewQuotaSelect.value)} 个`; };
+  const refreshQuotaNote = () => { quotaNote.textContent = `预计今日新词学习时间：约 ${estimateMinutes(Number(newQuotaSelect.value))} 分钟；自主复习数量：${Number(reviewQuotaSelect.value)} 个`; };
   newQuotaSelect.addEventListener("change", refreshQuotaNote);
   reviewQuotaSelect.addEventListener("change", refreshQuotaNote);
 
