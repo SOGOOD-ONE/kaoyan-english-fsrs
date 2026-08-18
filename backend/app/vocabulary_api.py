@@ -2,7 +2,7 @@ from datetime import datetime
 from functools import wraps
 from flask import Blueprint, jsonify, request, session
 from . import db
-from .models import User, Vocabulary, VocabularyWord, UserVocabulary, UserWordCard, Word
+from .models import User, Vocabulary, VocabularyWord, UserVocabulary, UserWordCard, Word, DailyPlan, UserSetting
 
 vocabulary_api = Blueprint("vocabulary_api", __name__)
 
@@ -21,6 +21,28 @@ def login_required(fn):
 def visible_vocab(user, vocabulary_id):
     return Vocabulary.query.filter_by(id=vocabulary_id).filter((Vocabulary.kind == "system") | (Vocabulary.owner_user_id == user.id)).first()
 
+def refresh_unstarted_daily_plan(user):
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=db.func.current_date()).first()
+    if not plan or plan.mandatory_completed != 0:
+        return
+    settings = UserSetting.query.filter_by(user_id=user.id).first()
+    review_quota = int(settings.daily_review_quota if settings else 100)
+    enabled_ids = [row.vocabulary_id for row in UserVocabulary.query.filter_by(user_id=user.id, enabled=True).all()]
+    if not enabled_ids:
+        plan.mandatory_total = 0
+        return
+    word_ids = [row.word_id for row in VocabularyWord.query.filter(VocabularyWord.vocabulary_id.in_(enabled_ids)).all()]
+    if not word_ids:
+        plan.mandatory_total = 0
+        return
+    due_count = UserWordCard.query.filter(
+        UserWordCard.user_id == user.id,
+        UserWordCard.word_id.in_(word_ids),
+        UserWordCard.due_at <= datetime.utcnow(),
+        UserWordCard.state != "new",
+    ).count()
+    plan.mandatory_total = min(due_count, review_quota)
+
 @vocabulary_api.get("/vocabularies/selections")
 @login_required
 def selections(user):
@@ -38,7 +60,9 @@ def update_selection(user, vocabulary_id):
     if not row: row = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary_id); db.session.add(row)
     if "enabled" in data: row.enabled = bool(data["enabled"])
     if "priority" in data: row.priority = max(0, min(int(data["priority"]), 1000))
-    row.updated_at = datetime.utcnow(); db.session.commit()
+    row.updated_at = datetime.utcnow()
+    refresh_unstarted_daily_plan(user)
+    db.session.commit()
     return jsonify({"vocabularyId": vocabulary_id, "enabled": row.enabled, "priority": row.priority})
 
 @vocabulary_api.put("/vocabularies/selections")
@@ -51,6 +75,7 @@ def replace_selections(user):
         row = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary_id).first()
         if not row: row = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary_id); db.session.add(row)
         row.enabled = bool(item.get("enabled", False)); row.priority = max(0, min(int(item.get("priority", vocabulary.priority)), 1000)); row.updated_at = datetime.utcnow()
+    refresh_unstarted_daily_plan(user)
     db.session.commit(); return selections(user)
 
 @vocabulary_api.post("/vocabularies/import")
@@ -93,6 +118,7 @@ def import_user_vocabulary(user):
         db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=50))
     else:
         selection.enabled = True; selection.updated_at = datetime.utcnow()
+    refresh_unstarted_daily_plan(user)
     db.session.commit()
     status = 201 if created_vocabulary else 200
     return jsonify({"id": vocabulary.id, "name": vocabulary.name, "inserted": inserted, "updated": updated, "linked": linked, "created": created_vocabulary, "words": response_words}), status
