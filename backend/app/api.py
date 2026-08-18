@@ -29,7 +29,8 @@ def login_required(fn):
 
 
 def user_json(user):
-    return {"id": user.id, "email": user.email, "nickname": user.nickname, "status": user.status,
+    """Serialize user for API responses (no email - privacy)."""
+    return {"id": user.id, "nickname": user.nickname, "status": user.status,
             "createdAt": user.created_at.isoformat(), "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None}
 
 
