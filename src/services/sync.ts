@@ -49,18 +49,27 @@ export async function pushPendingReviews(): Promise<number> {
 }
 
 export async function syncStudyData(): Promise<{ cards: number; reviews: number; uploaded: number }> {
+  // The server is authoritative. Flush any offline reviews first, then hydrate local state from it.
   const uploaded = await pushPendingReviews();
   const server = await apiRequest<SyncResponse>("/sync/study");
+  const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
+
+  // Replace/refresh remote reviews locally. Remote data is authoritative for already-synced review IDs.
   const localReviews = await store.getReviews();
   const localById = new Map(localReviews.map(r => [r.id, r]));
-  const remoteCardByWord = new Map(server.cards.map(card => [card.wordId, card]));
-  for (const remote of server.reviews) if (!localById.has(remote.id)) await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
+  for (const remote of server.reviews) {
+    if (!localById.has(remote.id)) {
+      await store.putReview(remoteReviewToStored(remote, remoteCardByWord.get(remote.wordId)));
+    }
+  }
 
+  // A remote card wins over a stale local card. A newer unsynced local review is preserved so it can be uploaded first.
   const localCards = await store.getCards();
   const localCardByWord = new Map(localCards.map(c => [c.wordId, c]));
+  const pendingIds = new Set((await store.getPendingReviews()).map(r => r.id));
   for (const remote of server.cards) {
     const local = localCardByWord.get(remote.wordId);
-    const localReviewsForWord = localReviews.filter(r => r.wordId === remote.wordId);
+    const localReviewsForWord = localReviews.filter(r => r.wordId === remote.wordId && !pendingIds.has(r.id));
     const latestLocal = localReviewsForWord.reduce<number>((max, r) => Math.max(max, r.reviewedAt), 0);
     const remoteTime = remote.lastReviewAt ? new Date(remote.lastReviewAt).getTime() : 0;
     if (!local || remoteTime >= latestLocal) await store.putCard(serverCardToLocal(remote));
