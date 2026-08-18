@@ -29,7 +29,6 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
     return { items, total: items.length };
   }
 
-  // 自主复习需要本地 FSRS 状态，因此进入前同步一次服务器状态；新词/必做复习无需这次额外同步。
   await syncStudyData().catch(() => undefined);
   const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
   const byId = new Map(words.map(word => [word.id, word]));
@@ -57,6 +56,30 @@ async function stopSession(sessionId: string) {
   }
 }
 
+function renderStudyShell(root: HTMLElement, mode: Mode, item: Item | undefined, index: number, total: number, answerVisible: boolean) {
+  const title = mode === "new" ? "学习新词" : mode === "mandatory" ? "今日复习" : "自主复习";
+  const desc = mode === "new" ? "完成今天的新词学习" : mode === "mandatory" ? "完成今天必须完成的复习" : "可以自由复习已经学习过的单词";
+  const percent = total ? Math.min(100, Math.round((index / total) * 100)) : 100;
+  root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count" id="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span id="study-session-progress" style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta" id="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2 id="study-word">${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button><div id="study-answer-slot">${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</div></section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 <span id="study-count">${Math.min(index, total)}</span> 个 · 本次进度会同步到你的账号</div></main>`;
+}
+
+function updateStudyCard(root: HTMLElement, item: Item, index: number, total: number, answerVisible: boolean) {
+  const progress = root.querySelector<HTMLElement>("#study-session-progress");
+  if (progress) progress.style.width = `${total ? Math.min(100, Math.round((index / total) * 100)) : 100}%`;
+  const count = root.querySelector<HTMLElement>("#study-session-count");
+  if (count) count.textContent = `${Math.min(index + 1, total)} / ${total}`;
+  const learned = root.querySelector<HTMLElement>("#study-count");
+  if (learned) learned.textContent = String(Math.min(index, total));
+  const word = root.querySelector<HTMLElement>("#study-word");
+  if (word) word.textContent = item.word.word;
+  const meta = root.querySelector<HTMLElement>("#study-word-meta");
+  if (meta) meta.innerHTML = `${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}`;
+  const reveal = root.querySelector<HTMLButtonElement>("#study-reveal");
+  if (reveal) reveal.textContent = answerVisible ? "收起释义" : "显示释义";
+  const slot = root.querySelector<HTMLElement>("#study-answer-slot");
+  if (slot) slot.innerHTML = answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : "";
+}
+
 export async function mountStudy(root: HTMLElement, mode: Mode) {
   root.innerHTML = `<div class="study-page"><div class="study-loading">正在加载学习内容…</div></div>`;
   try {
@@ -71,55 +94,52 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
     let index = 0;
     let answerVisible = false;
     const session = await apiRequest<{ sessionId: string }>("/study/session/start", { method: "POST", body: JSON.stringify({ mode }) });
-
     const handlePageHide = () => { void stopSession(session.sessionId); };
     window.addEventListener("pagehide", handlePageHide, { once: true });
 
-    const render = () => {
-      const item = items[index];
-      const percent = total ? Math.min(100, Math.round((index / total) * 100)) : 100;
-      const title = mode === "new" ? "学习新词" : mode === "mandatory" ? "今日复习" : "自主复习";
-      const desc = mode === "new" ? "完成今天的新词学习" : mode === "mandatory" ? "完成今天必须完成的复习" : "可以自由复习已经学习过的单词";
-      root.innerHTML = `<main class="study-page"><header class="study-session-head"><div><a href="/" class="study-back">← 返回首页</a><h1>${title}</h1><p>${desc}</p></div><div class="study-session-count">${Math.min(index + 1, total)} / ${total}</div></header><div class="study-session-track"><span style="width:${percent}%"></span></div>${item ? `<section class="study-word-panel"><div class="study-word-meta">${escapeHtml(item.word.category || "核心词")} ${item.word.type ? `· ${escapeHtml(item.word.type)}` : ""}</div><h2>${escapeHtml(item.word.word)}</h2><button class="study-reveal" id="study-reveal">${answerVisible ? "收起释义" : "显示释义"}</button>${answerVisible ? `<div class="study-answer"><div class="study-meaning">${escapeHtml(item.word.meaning)}</div><div class="study-source">${escapeHtml(item.word.source || "")}</div></div><div class="study-ratings"><button data-rating="1"><strong>不认识</strong><small>Again</small></button><button data-rating="2"><strong>模糊</strong><small>Hard</small></button><button data-rating="3"><strong>认识</strong><small>Good</small></button><button data-rating="4"><strong>很熟</strong><small>Easy</small></button></div>` : ""}</section>` : `<section class="study-complete"><div class="study-complete-kicker">本次学习完成</div><h2>${title}完成</h2><p>本次完成 ${total} 个单词。</p><a href="/" class="study-home-btn">返回首页</a></section>`}<div class="study-footnote">已学习 ${Math.min(index, total)} 个 · 本次进度会同步到你的账号</div></main>`;
+    const bindReveal = () => document.getElementById("study-reveal")?.addEventListener("click", () => {
+      answerVisible = !answerVisible;
+      updateStudyCard(root, items[index], index, total, answerVisible);
+      bindRatings();
+    });
 
-      document.getElementById("study-reveal")?.addEventListener("click", () => { answerVisible = !answerVisible; render(); });
-      root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
-        button.disabled = true;
-        const value = Number(button.dataset.rating);
-        const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1] as Grade;
-        const reviewType = mode === "new" ? "new" : mode === "mandatory" ? "mandatory" : "self";
-        try {
-          const result = await review(item.word, rating);
-          const reviewRows = await store.getReviews(item.word.id);
-          const saved = reviewRows.find(row => row.id === result.reviewId);
-          if (!saved) throw new Error("学习记录保存失败，请重试");
-          saved.reviewType = reviewType;
+    const bindRatings = () => root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
+      if (button.disabled) return;
+      button.disabled = true;
+      const value = Number(button.dataset.rating);
+      const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1] as Grade;
+      const reviewType = mode === "new" ? "new" : mode === "mandatory" ? "mandatory" : "self";
+      try {
+        const item = items[index];
+        const result = await review(item.word, rating);
+        const reviewRows = await store.getReviews(item.word.id);
+        const saved = reviewRows.find(row => row.id === result.reviewId);
+        if (!saved) throw new Error("学习记录保存失败，请重试");
+        saved.reviewType = reviewType;
+        const server = await submitReviewToServer(saved);
+        await store.markReviewSynced(saved.id);
 
-          const server = await submitReviewToServer(saved);
-          await store.markReviewSynced(saved.id);
-          // 不再为每个评分做完整的 /sync/study；服务器提交已经返回最新 card/today 状态。
-          if (reviewType === "mandatory" && server.today.mandatoryRemaining > 0) {
-            // 服务器队列会在下一次进入时提供准确剩余项。
-          }
-          if (reviewType === "new" && server.today.newCompleted >= server.today.newQuota) {
-            index = total - 1;
-          }
-
-          index += 1;
-          answerVisible = false;
-          if (index >= total) {
-            await stopSession(session.sessionId);
-            window.removeEventListener("pagehide", handlePageHide);
-          }
-          render();
-        } catch (error) {
-          button.disabled = false;
-          window.alert(error instanceof Error ? error.message : "提交失败，请重试");
+        index += 1;
+        answerVisible = false;
+        if (index >= total) {
+          await stopSession(session.sessionId);
+          window.removeEventListener("pagehide", handlePageHide);
+          renderStudyShell(root, mode, undefined, total, total, false);
+          return;
         }
-      }));
-    };
+        updateStudyCard(root, items[index], index, total, false);
+        bindReveal();
+        bindRatings();
+        void server;
+      } catch (error) {
+        button.disabled = false;
+        window.alert(error instanceof Error ? error.message : "提交失败，请重试");
+      }
+    }));
 
-    render();
+    renderStudyShell(root, mode, items[index], index, total, answerVisible);
+    bindReveal();
+    bindRatings();
   } catch (error) {
     root.innerHTML = `<main class="study-page"><section class="study-error"><h2>学习内容加载失败</h2><p>${escapeHtml(error instanceof Error ? error.message : "请刷新页面后重试")}</p><a href="/">返回首页</a></section></main>`;
   }
