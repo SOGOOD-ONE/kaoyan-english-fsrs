@@ -2,9 +2,10 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify
 
+from . import db
 from .api import login_required, selected_word_ids
 from .history import build_history
-from .models import DailyPlan, ReviewLog, StudySession, UserSetting, UserWordCard
+from .models import ReviewLog, StudySession, UserWordCard
 from .study_plan_api import card_retrievability, get_or_create_plan
 
 
@@ -76,9 +77,10 @@ def dashboard_summary(user):
     active = StudySession.query.filter_by(
         user_id=user.id, ended_at=None
     ).order_by(StudySession.started_at.desc()).first()
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     sessions = StudySession.query.filter(
         StudySession.user_id == user.id,
-        StudySession.started_at >= now.replace(hour=0, minute=0, second=0, microsecond=0),
+        StudySession.started_at >= start_of_day,
         StudySession.ended_at.isnot(None),
     ).all()
     today_seconds = sum(int(row.duration_seconds or 0) for row in sessions)
