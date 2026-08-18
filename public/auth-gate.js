@@ -3,6 +3,23 @@
   const ROOT_ID = "auth-gate-root";
   const STYLE_ID = "auth-gate-style";
   const HIDE_ID = "auth-gate-hide";
+  const USER_KEY = "currentUser";
+  const USER_DATA_KEY = "currentUserData";
+
+  // The V3 page still contains a legacy GitHub vocabulary loader. Keep that
+  // obsolete browser-to-GitHub request from firing; vocabulary is served by
+  // our application/backend instead.
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+    if (url.includes("api.github.com/repos/SOGOOD-ONE/kaoyan-vocab-data/contents/data.js")) {
+      return Promise.resolve(new Response(JSON.stringify({ content: "", encoding: "base64" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      }));
+    }
+    return originalFetch(input, init);
+  };
 
   const css = `
     #${ROOT_ID}{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(135deg,#f8fbff 0%,#eef4fb 100%);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#0f172a}
@@ -14,6 +31,16 @@
     #${ROOT_ID} .auth-panel{padding:42px}.auth-panel h2{font-size:24px;margin:0 0 7px}.auth-panel .desc{font-size:13px;color:#64748b;margin:0 0 25px}.tabs{display:flex;border-bottom:1px solid #e2e8f0;margin-bottom:22px}.tabs button{flex:1;border:0;background:none;padding:11px 0;font-size:14px;font-weight:650;color:#64748b;cursor:pointer;border-bottom:2px solid transparent}.tabs button.active{color:#2563eb;border-bottom-color:#2563eb}.form{display:grid;gap:15px}.field{display:grid;gap:7px}.field span{font-size:13px;font-weight:650}.field input{height:44px;width:100%;border:1px solid #dbe3ed;border-radius:10px;padding:0 13px;font-size:14px;outline:none;transition:.15s}.field input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px #dbeafe}.submit{height:45px;border:0;border-radius:11px;background:#2563eb;color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:3px}.submit:hover{background:#1d4ed8}.submit:disabled{opacity:.6;cursor:not-allowed}.status{min-height:18px;margin:0;text-align:center;font-size:12px;color:#dc2626}.hint{font-size:11px;color:#94a3b8;text-align:center;margin:0}.hidden{display:none!important}
     @media(max-width:720px){#${ROOT_ID} .auth-wrap{grid-template-columns:1fr}#${ROOT_ID} .auth-intro{display:none}#${ROOT_ID} .auth-panel{padding:30px 24px}}
   `;
+
+  function saveUser(user){
+    const safeUser = user && typeof user === "object" ? user : {};
+    const nickname = String(safeUser.nickname || safeUser.email || "考研用户");
+    // Legacy V3 code expects a display string. Keep the complete object in a
+    // separate key for code that genuinely needs user metadata.
+    localStorage.setItem(USER_KEY, nickname);
+    localStorage.setItem(USER_DATA_KEY, JSON.stringify(safeUser));
+    return nickname;
+  }
 
   function hideApp(){
     if(document.getElementById(HIDE_ID)) return;
@@ -45,9 +72,9 @@
     const $=id=>root.querySelector(id), loginTab=$("#auth-login-tab"), registerTab=$("#auth-register-tab"), nick=$("#auth-nickname-field"), confirm=$("#auth-confirm-field"), submit=$("#auth-submit"), title=$("#auth-title"), desc=$("#auth-desc"), status=$("#auth-status"), form=$("#auth-form");
     function sync(){const reg=current==="register";loginTab.classList.toggle("active",!reg);registerTab.classList.toggle("active",reg);nick.classList.toggle("hidden",!reg);confirm.classList.toggle("hidden",!reg);submit.textContent=reg?"创建账号":"登录";title.textContent=reg?"创建你的账号":"欢迎回来";desc.textContent=reg?"注册后即可保存并同步学习进度":"登录后继续你的学习计划";status.textContent="";$("#auth-password").autocomplete=reg?"new-password":"current-password"}
     loginTab.onclick=()=>{current="login";sync()};registerTab.onclick=()=>{current="register";sync()};sync();
-    form.addEventListener("submit",async e=>{e.preventDefault();status.textContent="";const email=$("#auth-email").value.trim().toLowerCase(),password=$("#auth-password").value,nickname=$("#auth-nickname").value.trim()||"考研用户",confirmation=$("#auth-confirm").value;if(current==="register"&&password!==confirmation){status.textContent="两次输入的密码不一致";return}submit.disabled=true;submit.textContent=current==="register"?"创建中…":"登录中…";try{const r=await fetch(`${API}/auth/${current}`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(current==="register"?{email,password,nickname}:{email,password})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data.error||`API ${r.status}`));const me=await fetch(`${API}/auth/me`,{credentials:"include"});if(!me.ok)throw new Error("auth_failed");const meData=await me.json();if(!meData.user)throw new Error("auth_failed");localStorage.setItem("currentUser",JSON.stringify(meData.user));showApp();location.reload()}catch(err){status.textContent=message(err instanceof Error?err.message:"auth_failed")}finally{submit.disabled=false;submit.textContent=current==="register"?"创建账号":"登录"}});
+    form.addEventListener("submit",async e=>{e.preventDefault();status.textContent="";const email=$("#auth-email").value.trim().toLowerCase(),password=$("#auth-password").value,nickname=$("#auth-nickname").value.trim()||"考研用户",confirmation=$("#auth-confirm").value;if(current==="register"&&password!==confirmation){status.textContent="两次输入的密码不一致";return}submit.disabled=true;submit.textContent=current==="register"?"创建中…":"登录中…";try{const r=await fetch(`${API}/auth/${current}`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(current==="register"?{email,password,nickname}:{email,password})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(String(data.error||`API ${r.status}`));const me=await fetch(`${API}/auth/me`,{credentials:"include"});if(!me.ok)throw new Error("auth_failed");const meData=await me.json();if(!meData.user)throw new Error("auth_failed");saveUser(meData.user);showApp();location.reload()}catch(err){status.textContent=message(err instanceof Error?err.message:"auth_failed")}finally{submit.disabled=false;submit.textContent=current==="register"?"创建账号":"登录"}});
   }
 
-  async function boot(){hideApp();ensureStyle();try{const r=await fetch(`${API}/auth/me`,{credentials:"include",cache:"no-store"});if(r.ok){const d=await r.json();if(d.user){localStorage.setItem("currentUser",JSON.stringify(d.user));showApp();return}}render("login")}catch(e){console.error("Auth gate check failed:",e);render("login")}}
+  async function boot(){hideApp();ensureStyle();try{const r=await fetch(`${API}/auth/me`,{credentials:"include",cache:"no-store"});if(r.ok){const d=await r.json();if(d.user){saveUser(d.user);showApp();return}}render("login")}catch(e){console.error("Auth gate check failed:",e);render("login")}}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else void boot();
 })();
