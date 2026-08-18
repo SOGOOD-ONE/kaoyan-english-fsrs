@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from flask import Blueprint, jsonify
+from sqlalchemy import func, distinct
 
 from . import db
 from .api import login_required, selected_word_ids
-from .history import build_history
 from .models import ReviewLog, StudySession, UserWordCard
 from .study_plan_api import card_retrievability, get_or_create_plan
 
@@ -93,7 +93,10 @@ def dashboard_summary(user):
         today_seconds += elapsed
         total_seconds += elapsed
 
-    history = build_history(user.id, 3650)
+    active_days = db.session.query(
+        func.count(distinct(func.date(ReviewLog.reviewed_at)))
+    ).filter(ReviewLog.user_id == user.id).scalar() or 0
+
     mandatory_completed = min(plan.mandatory_completed, plan.mandatory_total)
     review_remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
     return jsonify({
@@ -112,5 +115,5 @@ def dashboard_summary(user):
             "newCompleted": plan.new_completed,
             "reviewRemaining": review_remaining,
         },
-        "activeDays": history["activeDays"],
+        "activeDays": int(active_days),
     })
