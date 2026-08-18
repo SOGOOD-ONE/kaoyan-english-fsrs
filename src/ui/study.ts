@@ -1,6 +1,7 @@
 import "./study.css";
 import { apiRequest } from "../services/api";
 import { Rating, review } from "../fsrs/adapter";
+import type { Grade } from "../fsrs/adapter";
 import { store } from "../db/db";
 import { syncStudyData, uploadReview } from "../services/sync";
 
@@ -40,7 +41,7 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
       root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
         button.disabled = true;
         const value = Number(button.dataset.rating);
-        const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1];
+        const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1] as Grade;
         try {
           const result = await review(item.word, rating);
           const reviewRows = await store.getReviews(item.word.id);
