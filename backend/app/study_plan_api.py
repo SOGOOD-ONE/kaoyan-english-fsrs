@@ -9,26 +9,6 @@ from .models import DailyPlan, StudySession, UserSetting, UserWordCard, ReviewLo
 study_plan_api = Blueprint("study_plan_api", __name__)
 
 
-def get_or_create_plan(user):
-    today = date.today()
-    settings = UserSetting.query.filter_by(user_id=user.id).first()
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
-    if not plan:
-        quota = settings.daily_new_quota if settings else 100
-        plan = DailyPlan(user_id=user.id, plan_date=today, new_quota=quota)
-        db.session.add(plan)
-        db.session.commit()
-    return plan
-
-
-def card_retrievability(card, now=None):
-    if card.state != "review" or not card.last_review_at or card.stability <= 0:
-        return 0.0
-    now = now or datetime.utcnow()
-    elapsed_days = max(0.0, (now - card.last_review_at).total_seconds() / 86400.0)
-    return 0.9 ** (elapsed_days / max(float(card.stability), 1e-6))
-
-
 def today_due_cards(user):
     selected_ids = selected_word_ids(user)
     query = UserWordCard.query.filter(
@@ -41,6 +21,33 @@ def today_due_cards(user):
     else:
         query = query.filter(False)
     return query.order_by(UserWordCard.due_at.asc()).all()
+
+
+def get_or_create_plan(user):
+    today = date.today()
+    settings = UserSetting.query.filter_by(user_id=user.id).first()
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
+    if not plan:
+        quota = settings.daily_new_quota if settings else 100
+        due = today_due_cards(user)
+        plan = DailyPlan(
+            user_id=user.id,
+            plan_date=today,
+            new_quota=quota,
+            mandatory_total=len(due),
+            mandatory_completed=0,
+        )
+        db.session.add(plan)
+        db.session.commit()
+    return plan
+
+
+def card_retrievability(card, now=None):
+    if card.state != "review" or not card.last_review_at or card.stability <= 0:
+        return 0.0
+    now = now or datetime.utcnow()
+    elapsed_days = max(0.0, (now - card.last_review_at).total_seconds() / 86400.0)
+    return 0.9 ** (elapsed_days / max(float(card.stability), 1e-6))
 
 
 @study_plan_api.get("/study/overview")
@@ -61,12 +68,6 @@ def study_overview(user):
 @login_required
 def get_today_progress(user):
     plan = get_or_create_plan(user)
-    due = today_due_cards(user)
-    # Snapshot the amount of mandatory review when the day is first established.
-    # Once set, it does not shrink as cards are reviewed.
-    if plan.mandatory_total == 0 and plan.mandatory_completed == 0 and due:
-        plan.mandatory_total = len(due)
-        db.session.commit()
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     return jsonify({
         "date": plan.plan_date.isoformat(),
