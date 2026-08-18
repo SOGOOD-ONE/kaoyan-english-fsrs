@@ -10,8 +10,8 @@ function ensureRandomUUID() {
     const v = c === "x" ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
-  const cryptoLike = globalThis.crypto as Crypto & { randomUUID?: () => string };
-  try { cryptoLike.randomUUID = fallback; }
+  const cryptoLike = globalThis.crypto as Crypto & { randomUUID?: Crypto["randomUUID"] };
+  try { cryptoLike.randomUUID = fallback as Crypto["randomUUID"]; }
   catch { try { Object.defineProperty(cryptoLike, "randomUUID", { configurable: true, value: fallback }); } catch {} }
 }
 ensureRandomUUID();
