@@ -37,10 +37,12 @@ def create_app() -> Flask:
     from .vocabulary_api import vocabulary_api
     from .history_api import history_api
     from .study_plan_api import study_plan_api
+    from .review_quota_api import review_quota_api
     app.register_blueprint(api, url_prefix="/api")
     app.register_blueprint(vocabulary_api, url_prefix="/api")
     app.register_blueprint(history_api, url_prefix="/api")
     app.register_blueprint(study_plan_api, url_prefix="/api")
+    app.register_blueprint(review_quota_api, url_prefix="/api")
 
     with app.app_context():
         from . import models  # noqa: F401
