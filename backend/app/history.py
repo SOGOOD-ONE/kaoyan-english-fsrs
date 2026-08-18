@@ -19,33 +19,43 @@ def build_history(user_id, days=30):
         row = daily[key]
         row["reviews"] += 1
         row["words"].add(log.word_id)
-        if log.rating == 1: row["again"] += 1
-        elif log.rating == 2: row["hard"] += 1
-        elif log.rating == 3: row["good"] += 1
-        elif log.rating == 4: row["easy"] += 1
+        if log.rating == 1:
+            row["again"] += 1
+        elif log.rating == 2:
+            row["hard"] += 1
+        elif log.rating == 3:
+            row["good"] += 1
+        elif log.rating == 4:
+            row["easy"] += 1
 
+    # Only return dates on which the user actually studied.
+    # Empty calendar days are intentionally omitted from the history response.
     items = []
-    cursor = start.date()
-    while cursor <= end.date():
-        row = daily[cursor.isoformat()]
+    for day, row in sorted(daily.items()):
         reviews = row["reviews"]
+        if reviews <= 0:
+            continue
         items.append({
-            "date": cursor.isoformat(),
+            "date": day,
             "reviews": reviews,
             "words": len(row["words"]),
             "again": row["again"],
             "hard": row["hard"],
             "good": row["good"],
             "easy": row["easy"],
-            "accuracy": round((row["good"] + row["easy"]) / reviews * 100, 1) if reviews else 0,
+            "accuracy": round((row["good"] + row["easy"]) / reviews * 100, 1),
         })
-        cursor += timedelta(days=1)
 
-    review_dates = {item["date"] for item in items if item["reviews"] > 0}
+    review_dates = {item["date"] for item in items}
     streak = 0
     cursor = end.date()
     while cursor.isoformat() in review_dates:
         streak += 1
         cursor -= timedelta(days=1)
 
-    return {"days": items, "streak": streak, "totalReviews": len(logs), "activeDays": len(review_dates)}
+    return {
+        "days": items,
+        "streak": streak,
+        "totalReviews": len(logs),
+        "activeDays": len(review_dates),
+    }
