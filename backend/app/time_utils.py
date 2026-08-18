@@ -14,6 +14,11 @@ def user_timezone(user):
     return BEIJING_ZONE
 
 
+def utc_now_naive() -> datetime:
+    """Return the current UTC time as a naive datetime for DB compatibility."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 def local_now(user):
     return datetime.now(timezone.utc).astimezone(BEIJING_ZONE)
 
