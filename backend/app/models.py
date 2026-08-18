@@ -122,6 +122,13 @@ class ReviewLog(db.Model):
     reviewed_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     elapsed_seconds = db.Column(db.Integer)
 
+    __table_args__ = (
+        db.Index("idx_review_log_user_reviewed_at", "user_id", "reviewed_at"),
+        db.Index("idx_review_log_card", "card_id"),
+        db.Index("idx_review_log_word", "word_id"),
+    )
+
+
 
 class StudySession(db.Model):
     __tablename__ = 'study_sessions'
@@ -131,6 +138,12 @@ class StudySession(db.Model):
     started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     ended_at = db.Column(db.DateTime)
     duration_seconds = db.Column(db.Integer, nullable=False, default=0)
+
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "plan_date", name="uq_user_plan_date"),
+        db.Index("idx_dp_plan_date", "plan_date"),
+    )
 
 
 class DailyPlan(db.Model):
