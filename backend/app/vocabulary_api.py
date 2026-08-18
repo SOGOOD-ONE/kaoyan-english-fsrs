@@ -3,6 +3,7 @@ from functools import wraps
 from flask import Blueprint, jsonify, request, session
 from . import db
 from .models import User, Vocabulary, VocabularyWord, UserVocabulary, UserWordCard, Word, DailyPlan, UserSetting
+from .time_utils import local_today
 
 vocabulary_api = Blueprint("vocabulary_api", __name__)
 
@@ -22,7 +23,7 @@ def visible_vocab(user, vocabulary_id):
     return Vocabulary.query.filter_by(id=vocabulary_id).filter((Vocabulary.kind == "system") | (Vocabulary.owner_user_id == user.id)).first()
 
 def refresh_unstarted_daily_plan(user):
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=db.func.current_date()).first()
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=local_today(user)).first()
     if not plan or plan.mandatory_completed != 0:
         return
     settings = UserSetting.query.filter_by(user_id=user.id).first()
