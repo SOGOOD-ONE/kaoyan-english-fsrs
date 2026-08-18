@@ -27,7 +27,7 @@ function restoreCard(row: ServerCard): Card {
 }
 
 export async function restoreCloudStudyState() {
-  const result = await apiRequest<{ cards: ServerCard[] }>("/sync/study");
+  const result = await apiRequest<{ cards: ServerCard[] }>("/sync/study-incremental");
   let restored = 0;
   for (const row of result.cards) {
     if (!row.wordId || !row.dueAt) continue;
