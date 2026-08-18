@@ -17,11 +17,9 @@ services:
     restart: unless-stopped
     volumes:
       - backend_data:/data
-    # For production, use expose + reverse proxy (nginx/caddy) instead of ports
-    # ports:
-    #   - "5000:5000"
-    expose:
-      - "5000"
+    # Publish on localhost so the host nginx reverse proxy can reach it.
+    ports:
+      - "127.0.0.1:5000:5000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/api/health', timeout=3)"]
       interval: 30s
