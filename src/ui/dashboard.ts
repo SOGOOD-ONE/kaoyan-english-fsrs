@@ -8,7 +8,7 @@ type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; manda
 type DashboardSummary = { overview: Overview; time: StudyTime; today: TodayProgress; activeDays: number };
 type User = { id: string; email: string; nickname: string };
 
-function formatDuration(seconds: number) { const totalMinutes = Math.max(0, Math.floor(seconds / 60)); if (totalMinutes < 60) return `${totalMinutes} 分钟`; const hours = Math.floor(totalMinutes / 60); const minutes = totalMinutes % 60; return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`; }
+function formatDuration(seconds: number) { const totalMinutes = Math.max(0, Math.floor(seconds / 60)); return `${totalMinutes} 分钟`; }
 function stat(label: string, value: number, muted = false) { return `<div class="overview-stat${muted ? " muted" : ""}"><strong>${value.toLocaleString()}</strong><span>${label}</span></div>`; }
 function formatDate() { const now = new Date(); return `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`; }
 
