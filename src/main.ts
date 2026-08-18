@@ -1,4 +1,5 @@
 import "./style.css";
+import "./ui/ui-polish.css";
 import { mountDashboard } from "./ui/dashboard";
 import { mountStudy } from "./ui/study";
 import { mountSettings } from "./ui/settings";
