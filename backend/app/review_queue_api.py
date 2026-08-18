@@ -44,6 +44,7 @@ def review_queue(user):
         UserWordCard.query.filter(
             UserWordCard.user_id == user.id,
             UserWordCard.word_id.in_(selected_ids),
+            UserWordCard.known_excluded.is_(False),
             UserWordCard.due_at <= datetime.utcnow(),
             UserWordCard.state != "new",
         )
