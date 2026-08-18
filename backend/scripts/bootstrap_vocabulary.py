@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 WORKBOOKS = [
     {"filename": "考研英语核心词_单词表_2026-08-16.xlsx", "name": "考研英语核心词", "priority": 100, "source": "bundled_excel"},
+    {"filename": "考研英语大纲5500词词汇表完美打印乱序版.xlsx", "name": "考研英语大纲5500词", "priority": 99, "source": "bundled_excel"},
     {"filename": "作文公共词库.xlsx", "name": "作文公共词库", "priority": 90, "source": "bundled_excel"},
     {"filename": "考研英语二真题词库.xlsx", "name": "考研英语二真题词", "priority": 95, "source": "bundled_excel"},
     {"filename": "长难词库.xlsx", "name": "考研英语长难词", "priority": 92, "source": "bundled_excel"},

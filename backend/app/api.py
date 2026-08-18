@@ -136,11 +136,13 @@ def register():
     db.session.add(user)
     db.session.flush()
     db.session.add(UserSetting(user_id=user.id, timezone=DEFAULT_TIMEZONE))
-    core = Vocabulary.query.filter_by(name="考研英语核心词", kind="system").first()
-    if core:
-        existing = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=core.id).first()
+    for vocabulary_name in ("考研英语核心词", "考研英语大纲5500词"):
+        vocabulary = Vocabulary.query.filter_by(name=vocabulary_name, kind="system").first()
+        if not vocabulary:
+            continue
+        existing = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary.id).first()
         if not existing:
-            db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=core.id, enabled=True, priority=core.priority))
+            db.session.add(UserVocabulary(user_id=user.id, vocabulary_id=vocabulary.id, enabled=True, priority=vocabulary.priority))
     db.session.commit()
     session.clear()
     session["user_id"] = user.id
