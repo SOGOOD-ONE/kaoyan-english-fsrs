@@ -1,31 +1,13 @@
-from datetime import date, datetime, time, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
 from . import db
 from .api import login_required, selected_word_ids
 from .models import DailyPlan, StudySession, UserSetting, UserWordCard, ReviewLog
+from .time_utils import local_today, local_day_start_utc, user_timezone
 
 study_plan_api = Blueprint("study_plan_api", __name__)
-
-
-def get_user_timezone(user):
-    settings = UserSetting.query.filter_by(user_id=user.id).first()
-    try:
-        return ZoneInfo(settings.timezone if settings and settings.timezone else "Asia/Shanghai")
-    except Exception:
-        return ZoneInfo("Asia/Shanghai")
-
-
-def local_today(user):
-    return datetime.now(timezone.utc).astimezone(get_user_timezone(user)).date()
-
-
-def local_day_start_utc(user, day):
-    zone = get_user_timezone(user)
-    local_start = datetime.combine(day, time.min, tzinfo=zone)
-    return local_start.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def today_due_cards(user):
@@ -50,13 +32,7 @@ def get_or_create_plan(user):
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
     if not plan:
         due = today_due_cards(user)
-        plan = DailyPlan(
-            user_id=user.id,
-            plan_date=today,
-            new_quota=quota,
-            mandatory_total=min(len(due), review_quota),
-            mandatory_completed=0,
-        )
+        plan = DailyPlan(user_id=user.id, plan_date=today, new_quota=quota, mandatory_total=min(len(due), review_quota), mandatory_completed=0)
         db.session.add(plan)
         db.session.commit()
     elif plan.mandatory_completed == 0:
@@ -82,24 +58,10 @@ def study_overview(user):
     word_ids = selected_word_ids(user)
     total = len(word_ids)
     if not word_ids:
-        return jsonify({
-            "totalWords": 0,
-            "learnedWords": 0,
-            "reviewedWords": 0,
-            "masteredWords": 0,
-            "remainingWords": 0,
-            "progressPercent": 0.0,
-        })
+        return jsonify({"totalWords": 0, "learnedWords": 0, "reviewedWords": 0, "masteredWords": 0, "remainingWords": 0, "progressPercent": 0.0})
 
-    cards = UserWordCard.query.filter(
-        UserWordCard.user_id == user.id,
-        UserWordCard.word_id.in_(word_ids),
-    ).all()
-    logs = ReviewLog.query.filter(
-        ReviewLog.user_id == user.id,
-        ReviewLog.word_id.in_(word_ids),
-    ).all()
-
+    cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all()
+    logs = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.word_id.in_(word_ids)).all()
     reviews_by_word = {}
     for log in logs:
         reviews_by_word[log.word_id] = reviews_by_word.get(log.word_id, 0) + 1
@@ -107,36 +69,18 @@ def study_overview(user):
     card_by_word = {card.word_id: card for card in cards}
     learned_ids = {word_id for word_id, count in reviews_by_word.items() if count > 0}
     learned_ids.update(card.word_id for card in cards if card.first_learned_at is not None)
-
     reviewed_ids = {word_id for word_id, count in reviews_by_word.items() if count >= 2}
     reviewed_ids.update(card.word_id for card in cards if card.review_count >= 2)
 
     mastered_ids = set()
     for word_id in reviewed_ids:
         card = card_by_word.get(word_id)
-        if not card:
-            continue
-        if (
-            card.state == "review"
-            and card.review_count >= 2
-            and card.stability >= 1.5
-            and card_retrievability(card) >= 0.9
-            and card.correct_count >= card.wrong_count
-        ):
+        if card and card.state == "review" and card.review_count >= 2 and card.stability >= 1.5 and card_retrievability(card) >= 0.9 and card.correct_count >= card.wrong_count:
             mastered_ids.add(word_id)
 
-    learned = len(learned_ids)
-    reviewed = len(reviewed_ids)
-    mastered = len(mastered_ids)
+    learned, reviewed, mastered = len(learned_ids), len(reviewed_ids), len(mastered_ids)
     remaining = max(0, total - learned)
-    return jsonify({
-        "totalWords": total,
-        "learnedWords": learned,
-        "reviewedWords": reviewed,
-        "masteredWords": mastered,
-        "remainingWords": remaining,
-        "progressPercent": round((learned / total) * 100, 1) if total else 0.0,
-    })
+    return jsonify({"totalWords": total, "learnedWords": learned, "reviewedWords": reviewed, "masteredWords": mastered, "remainingWords": remaining, "progressPercent": round((learned / total) * 100, 1) if total else 0.0})
 
 
 @study_plan_api.get("/study/today/progress")
@@ -144,17 +88,7 @@ def study_overview(user):
 def get_today_progress(user):
     plan = get_or_create_plan(user)
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
-    return jsonify({
-        "date": plan.plan_date.isoformat(),
-        "newQuota": plan.new_quota,
-        "newCompleted": plan.new_completed,
-        "mandatoryTotal": plan.mandatory_total,
-        "mandatoryCompleted": min(plan.mandatory_completed, plan.mandatory_total),
-        "selfTotal": plan.self_total,
-        "selfCompleted": plan.self_completed,
-        "activeSessionId": active.id if active else None,
-        "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed),
-    })
+    return jsonify({"date": plan.plan_date.isoformat(), "newQuota": plan.new_quota, "newCompleted": plan.new_completed, "mandatoryTotal": plan.mandatory_total, "mandatoryCompleted": min(plan.mandatory_completed, plan.mandatory_total), "selfTotal": plan.self_total, "selfCompleted": plan.self_completed, "activeSessionId": active.id if active else None, "reviewRemaining": max(0, plan.mandatory_total - plan.mandatory_completed)})
 
 
 @study_plan_api.post("/study/today/progress")
@@ -186,7 +120,6 @@ def start_study_session(user):
     for active in active_sessions:
         active.ended_at = now
         active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
-
     session = StudySession(user_id=user.id, mode=mode, started_at=now)
     db.session.add(session)
     db.session.commit()
@@ -212,23 +145,14 @@ def stop_study_session(user, session_id):
 def study_time(user):
     today = local_today(user)
     start = local_day_start_utc(user, today)
-    sessions = StudySession.query.filter(
-        StudySession.user_id == user.id,
-        StudySession.started_at >= start,
-        StudySession.ended_at.isnot(None),
-    ).all()
+    sessions = StudySession.query.filter(StudySession.user_id == user.id, StudySession.started_at >= start, StudySession.ended_at.isnot(None)).all()
     today_seconds = sum(int(row.duration_seconds or 0) for row in sessions)
-    total_seconds = db.session.query(
-        db.func.coalesce(db.func.sum(StudySession.duration_seconds), 0)
-    ).filter(StudySession.user_id == user.id).scalar() or 0
-    total_seconds = int(total_seconds)
-
+    total_seconds = int(db.session.query(db.func.coalesce(db.func.sum(StudySession.duration_seconds), 0)).filter(StudySession.user_id == user.id).scalar() or 0)
     active = StudySession.query.filter_by(user_id=user.id, ended_at=None).order_by(StudySession.started_at.desc()).first()
     if active:
         elapsed = max(0, int((datetime.utcnow() - active.started_at).total_seconds()))
         today_seconds += elapsed
         total_seconds += elapsed
-
     return jsonify({"todaySeconds": today_seconds, "totalSeconds": total_seconds, "activeSessionId": active.id if active else None})
 
 
