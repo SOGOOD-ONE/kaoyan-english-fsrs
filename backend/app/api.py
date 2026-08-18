@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db
 from .models import DailyPlan, ReviewLog, User, UserSetting, UserVocabulary, UserWordCard, Vocabulary, VocabularyWord, Word
+from .time_utils import local_day_start_utc, local_today, local_now
 
 api = Blueprint("api", __name__)
 
@@ -155,7 +156,7 @@ def update_settings(user):
         if quota not in DAILY_QUOTAS:
             return jsonify({"error": "invalid_daily_quota", "allowed": sorted(DAILY_QUOTAS)}), 400
         settings.daily_new_quota = quota
-        plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=date.today()).first()
+        plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=local_today(user)).first()
         if plan:
             plan.new_quota = quota
     if "timezone" in data:
@@ -237,7 +238,7 @@ def words(user):
 @api.get("/study/today")
 @login_required
 def study_today(user):
-    today = date.today()
+    today = local_today(user)
     settings = UserSetting.query.filter_by(user_id=user.id).first() or UserSetting(user_id=user.id)
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
 
@@ -269,7 +270,7 @@ def study_today(user):
         plan.new_quota = settings.daily_new_quota
     plan.new_completed = min(plan.new_completed, len(new_words))
 
-    day_start = datetime.combine(today, datetime.min.time())
+    day_start = local_day_start_utc(user, today)
     today_logs = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= day_start).all()
     db.session.commit()
 
@@ -308,7 +309,7 @@ def create_review(user):
             return jsonify({"review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()},
                             "card": card_json(existing_card_row) if existing_card_row else None, "duplicate": True})
 
-    today = date.today()
+    today = local_today(user)
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
     if review_type == "new" and plan:
         mandatory_remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
