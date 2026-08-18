@@ -34,6 +34,7 @@ async function bootstrap() {
   if (path === "/vocabularies") { if (await requireAuth()) await mountVocabularies(appRoot); return; }
   if (path === "/history") { if (await requireAuth()) await mountHistory(appRoot); return; }
   if (path === "/study/new") { if (await requireAuth()) await mountStudy(appRoot, "new"); return; }
+  if (path === "/study/review") { if (await requireAuth()) await mountStudy(appRoot, "mandatory"); return; }
   if (path === "/study/self") { if (await requireAuth()) await mountStudy(appRoot, "self"); return; }
   if (await requireAuth()) await mountDashboard(appRoot);
 }
