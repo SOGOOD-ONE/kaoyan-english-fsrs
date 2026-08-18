@@ -145,12 +145,6 @@ class StudySession(db.Model):
     duration_seconds = db.Column(db.Integer, nullable=False, default=0)
 
 
-    __table_args__ = (
-        db.UniqueConstraint("user_id", "plan_date", name="uq_user_plan_date"),
-        db.Index("idx_dp_plan_date", "plan_date"),
-    )
-
-
 class DailyPlan(db.Model):
     __tablename__ = 'daily_plans'
     id = db.Column(db.String(36), primary_key=True, default=uid)
