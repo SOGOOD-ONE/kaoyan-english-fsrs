@@ -7,7 +7,6 @@ type ServerCard = { id: string; wordId: string; state: string; stability: number
 type ServerReview = { id: string; wordId: string; rating: number; reviewedAt: string; reviewType: string };
 type SyncResponse = { cards: ServerCard[]; reviews: ServerReview[] };
 type ServerReviewResult = { review: { id: string; reviewedAt: string }; card: ServerCard; duplicate?: boolean };
-type ServerToday = { mandatoryCompleted: number; mandatoryTotal: number; mandatoryRemaining: number; newCompleted: number; newQuota: number; reviewRemaining?: number };
 
 function serverStateToLocal(state: string): Card["state"] {
   const normalized = String(state).toLowerCase();
@@ -73,9 +72,9 @@ export async function syncStudyData(): Promise<{ cards: number; reviews: number;
   return { cards: server.cards.length, reviews: server.reviews.length, uploaded };
 }
 
-export async function submitReviewToServer(review: StoredReview): Promise<{ result: ServerReviewResult; today: ServerToday }> {
+export async function submitReviewToServer(review: StoredReview): Promise<ServerReviewResult> {
   const localCard = review.card;
-  const result = await apiRequest<ServerReviewResult>("/reviews", {
+  return apiRequest<ServerReviewResult>("/reviews", {
     method: "POST",
     body: JSON.stringify({
       reviewId: review.id,
@@ -94,8 +93,6 @@ export async function submitReviewToServer(review: StoredReview): Promise<{ resu
       } : undefined,
     }),
   });
-  const today = await apiRequest<ServerToday>("/study/today/progress");
-  return { result, today };
 }
 
 export async function uploadReview(review: StoredReview): Promise<void> {
