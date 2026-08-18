@@ -45,13 +45,11 @@ export default defineConfig({
           '    <script src="/auth-gate.js"></script>\n</head>'
         );
 
-        // Keep FSRS in the application bundle instead of depending on a CDN at runtime.
         output = output.replace(
-          /import\\s+\\*\\s+as\\s+TSFSRS\\s+from\\s+[\"']https:\\/\\/cdn\\.jsdelivr\\.net\\/npm\\/ts-fsrs@5\\.4\\.1\\/\\+esm[\"'];?/g,
+          /import\s+\*\s+as\s+TSFSRS\s+from\s+["']https:\/\/cdn\.jsdelivr\.net\/npm\/ts-fsrs@5\.4\.1\/\+esm["'];?/g,
           'import * as TSFSRS from "/src/fsrs-browser.ts";'
         );
 
-        // The legacy V3 page used GitHub Contents API data.js. Use our authenticated backend instead.
         output = replaceFunction(
           output,
           "loadRemoteVocab",
@@ -73,7 +71,6 @@ export default defineConfig({
 `
         );
 
-        // The page already receives the bundled FSRS module above; never fall back to a CDN.
         output = replaceFunction(
           output,
           "ensureFSRS",
@@ -84,8 +81,7 @@ export default defineConfig({
 `
         );
 
-        // The old data.js script was only a GitHub-hosted vocabulary fallback.
-        output = output.replace(/\\s*<script[^>]+src=[\"'](?:\\.\\/)?data\\.js[\"'][^>]*><\\/script>/gi, "");
+        output = output.replace(/\s*<script[^>]+src=["'](?:\.\/)?data\.js["'][^>]*><\/script>/gi, "");
         return output;
       }
     }
