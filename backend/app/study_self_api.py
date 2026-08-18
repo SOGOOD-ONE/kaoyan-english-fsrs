@@ -1,9 +1,8 @@
-from datetime import datetime
-
 from flask import Blueprint, jsonify
 
 from .api import login_required, selected_word_ids
 from .models import UserSetting, UserWordCard, Word
+from .time_utils import utc_now_naive
 
 study_self_api = Blueprint("study_self_api", __name__)
 
@@ -40,7 +39,7 @@ def self_queue(user):
         UserWordCard.review_count > 0,
     ).all()
 
-    now = datetime.utcnow()
+    now = utc_now_naive()
     def score(card):
         overdue_days = max(0.0, (now - card.due_at).total_seconds() / 86400.0) if card.due_at else 0.0
         stability = max(float(card.stability or 0.0), 0.1)
