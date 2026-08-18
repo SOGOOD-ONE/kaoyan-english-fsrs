@@ -3,7 +3,7 @@ import { apiRequest } from "../services/api";
 type Overview = { totalWords: number; learnedWords: number; reviewedWords: number; masteredWords: number; remainingWords: number; progressPercent: number };
 type StudyTime = { todaySeconds: number; totalSeconds: number; activeSessionId?: string | null };
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; selfTotal: number; selfCompleted: number; newQuota: number; newCompleted: number; reviewRemaining?: number };
-type History = { activeDays: number };
+type DashboardSummary = { overview: Overview; time: StudyTime; today: TodayProgress; activeDays: number };
 type User = { id: string; email: string; nickname: string };
 
 function formatDuration(seconds: number) { const totalMinutes = Math.max(0, Math.floor(seconds / 60)); if (totalMinutes < 60) return `${totalMinutes} 分钟`; const hours = Math.floor(totalMinutes / 60); const minutes = totalMinutes % 60; return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`; }
@@ -11,14 +11,11 @@ function stat(label: string, value: number, muted = false) { return `<div class=
 function formatDate() { const now = new Date(); return `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`; }
 
 async function loadDashboard() {
-  const [overview, time, today, history, me] = await Promise.all([
-    apiRequest<Overview>("/study/overview"),
-    apiRequest<StudyTime>("/study/time"),
-    apiRequest<TodayProgress>("/study/today/progress"),
-    apiRequest<History>("/history?days=3650"),
+  const [summary, me] = await Promise.all([
+    apiRequest<DashboardSummary>("/study/dashboard-summary"),
     apiRequest<{ user: User }>("/auth/me"),
   ]);
-  return { overview, time, today, activeDays: history.activeDays, user: me.user };
+  return { ...summary, user: me.user };
 }
 
 export async function mountDashboard(root: HTMLElement) {
