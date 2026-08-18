@@ -1,3 +1,4 @@
+import "./study.css";
 import { apiRequest } from "../services/api";
 import { Rating, review } from "../fsrs/adapter";
 import { store } from "../db/db";
@@ -6,7 +7,6 @@ import { syncStudyData, uploadReview } from "../services/sync";
 type Mode = "new" | "self";
 type ServerWord = { id: string; word: string; type?: string; meaning: string; category?: string; source?: string };
 type Today = { review: { wordId: string; state: string; stability: number; difficulty: number; dueAt: string; reviewCount: number }[]; newWords: ServerWord[]; newTotal: number; newCompleted: number; reviewTotal: number; reviewCompleted: number };
-
 type Item = { word: ServerWord; card?: Today["review"][number] };
 
 function escapeHtml(value: string) {
@@ -26,7 +26,7 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number; do
 export async function mountStudy(root: HTMLElement, mode: Mode) {
   root.innerHTML = `<div class="study-page"><div class="study-loading">正在加载学习内容…</div></div>`;
   try {
-    const { items, total, done } = await loadItems(mode);
+    const { items, total } = await loadItems(mode);
     let index = 0;
     let answerVisible = false;
     const session = await apiRequest<{ sessionId: string }>("/study/session/start", { method: "POST", body: JSON.stringify({ mode }) });
@@ -39,9 +39,10 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
       document.getElementById("study-reveal")?.addEventListener("click", () => { answerVisible = !answerVisible; render(); });
       root.querySelectorAll<HTMLButtonElement>("[data-rating]").forEach(button => button.addEventListener("click", async () => {
         button.disabled = true;
-        const rating = Number(button.dataset.rating) as 1 | 2 | 3 | 4;
+        const value = Number(button.dataset.rating);
+        const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1];
         try {
-          const result = await review(item.word, rating as typeof Rating.Good);
+          const result = await review(item.word, rating);
           const reviewRows = await store.getReviews(item.word.id);
           const saved = reviewRows.find(row => row.id === result.reviewId);
           if (saved) await uploadReview(saved);
