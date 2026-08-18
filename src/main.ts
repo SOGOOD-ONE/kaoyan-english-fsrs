@@ -10,7 +10,6 @@ import { apiRequest } from "./services/api";
 const root = document.querySelector<HTMLDivElement>("#app");
 if (!root) throw new Error("Missing #app");
 const appRoot: HTMLElement = root;
-const BASE_PATH = "";
 
 export function appPath(path = "/") {
   return path.startsWith("/") ? path : `/${path}`;
@@ -37,10 +36,7 @@ async function requireAuth(): Promise<boolean> {
 
 async function bootstrap() {
   installAuthNavigation();
-  let path = window.location.pathname;
-  if (BASE_PATH && path === BASE_PATH) path = "/";
-  else if (BASE_PATH && path.startsWith(BASE_PATH + "/")) path = path.slice(BASE_PATH.length) || "/";
-  path = path.replace(/\/+$/, "") || "/";
+  let path = window.location.pathname.replace(/\/+$/, "") || "/";
   if (path === "/login") { await mountAuth(appRoot, "login"); return; }
   if (path === "/register") { await mountAuth(appRoot, "register"); return; }
   if (path === "/settings") { if (await requireAuth()) await mountSettings(appRoot); return; }
@@ -48,7 +44,9 @@ async function bootstrap() {
   if (path === "/history") { if (await requireAuth()) await mountHistory(appRoot); return; }
   try {
     const me = await apiRequest<{ user: unknown }>("/auth/me");
-    if (me?.user) { try { await syncStudyData(); } catch (error) { console.warn("Cloud sync skipped:", error); } }
+    if (me?.user) {
+      try { await syncStudyData(); } catch (error) { console.warn("Cloud sync skipped:", error); }
+    }
   } catch (error) { console.warn("Auth check skipped:", error); }
   await mount(appRoot);
 }
