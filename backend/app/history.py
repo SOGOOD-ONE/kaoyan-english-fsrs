@@ -1,12 +1,11 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from .models import ReviewLog
-from .timezone_utils import local_day_start_utc, local_now, user_timezone
+from .models import ReviewLog, User
+from .time_utils import local_day_start_utc, local_now, user_timezone
 
 
 def build_history(user_id, days=30):
-    from .models import User
     user = User.query.filter_by(id=user_id).first()
     if not user:
         return {"days": [], "streak": 0, "totalReviews": 0, "activeDays": 0}
@@ -60,9 +59,4 @@ def build_history(user_id, days=30):
         streak += 1
         cursor -= timedelta(days=1)
 
-    return {
-        "days": items,
-        "streak": streak,
-        "totalReviews": len(logs),
-        "activeDays": len(review_dates),
-    }
+    return {"days": items, "streak": streak, "totalReviews": len(logs), "activeDays": len(review_dates)}
