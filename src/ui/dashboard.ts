@@ -1,3 +1,4 @@
+import "./dashboard-overrides.css";
 import { apiRequest } from "../services/api";
 import { renderNav } from "./nav";
 
@@ -25,12 +26,8 @@ export async function mountDashboard(root: HTMLElement) {
     const { overview, time, today, activeDays, user } = await loadDashboard();
     const reviewRemaining = Math.max(0, today.reviewRemaining ?? (today.mandatoryTotal - today.mandatoryCompleted));
     const reviewRequired = reviewRemaining > 0;
-    const reviewTotal = today.mandatoryTotal;
-    const reviewCompleted = Math.min(today.mandatoryCompleted, reviewTotal);
     const newCompleted = Math.min(today.newCompleted, today.newQuota);
     const newRemaining = Math.max(0, today.newQuota - newCompleted);
-    const reviewLabel = reviewTotal > 0 ? `${reviewCompleted}/${reviewTotal}` : "昨日新词已完成";
-    const newLabel = reviewRequired ? "完成昨日新词复习后解锁" : newRemaining > 0 ? `剩余 ${newRemaining} 个` : "今日新词已完成";
     root.innerHTML = `
       <div class="dashboard-shell">
         <header class="dashboard-header">
@@ -47,11 +44,11 @@ export async function mountDashboard(root: HTMLElement) {
           </section>
           <section class="dashboard-time-grid"><div class="dashboard-time-card"><span>今日学习时长</span><strong>${formatDuration(time.todaySeconds)}</strong></div><div class="dashboard-time-card"><span>总学习时长</span><strong>${formatDuration(time.totalSeconds)}</strong></div><div class="dashboard-time-card"><span>活跃天数</span><strong>${activeDays}</strong></div></section>
           <section class="dashboard-actions">
-            <a class="study-action review-required" href="/study/review"><span class="study-action-title">复习昨日新词</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项 · ${today.mandatorySourceDate || "昨日"}` : reviewLabel}</span><span class="study-action-arrow">→</span></a>
+            <a class="study-action review-required" href="/study/review"><span class="study-action-title">复习昨日新词</span><span class="study-action-arrow">→</span></a>
             ${reviewRequired || newRemaining === 0
-              ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">${reviewRequired ? "🔒" : "✓"}</span></div>`
-              : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">→</span></a>`}
-            <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span><span class="study-action-desc">FSRS 根据稳定性、到期程度和难度推荐今日复习</span><span class="study-action-arrow">→</span></a>
+              ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-arrow">${reviewRequired ? "🔒" : "✓"}</span></div>`
+              : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span><span class="study-action-arrow">→</span></a>`}
+            <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span><span class="study-action-arrow">→</span></a>
           </section>
         </main>
       </div>`;
