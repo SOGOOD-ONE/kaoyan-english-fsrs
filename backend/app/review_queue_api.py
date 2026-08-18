@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Blueprint, jsonify
 
 from .api import login_required, selected_word_ids
@@ -42,7 +44,7 @@ def review_queue(user):
         UserWordCard.query.filter(
             UserWordCard.user_id == user.id,
             UserWordCard.word_id.in_(selected_ids),
-            UserWordCard.due_at <= __import__("datetime").datetime.utcnow(),
+            UserWordCard.due_at <= datetime.utcnow(),
             UserWordCard.state != "new",
         )
         .order_by(UserWordCard.due_at.asc(), UserWordCard.last_review_at.asc(), UserWordCard.id.asc())
