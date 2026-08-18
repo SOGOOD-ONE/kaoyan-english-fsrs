@@ -11,6 +11,7 @@ type ServerCard = { id: string; wordId: string; state: string; stability: number
 type Today = { review: ServerCard[]; newUnlocked: boolean; mandatoryRemaining: number; mandatoryCompleted: number; mandatoryTotal: number };
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number };
 type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; completed: number; words: ServerWord[] };
+type ReviewQueue = { quota: number; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
 type Item = { word: ServerWord; card?: ServerCard };
 
 function escapeHtml(value: string) {
@@ -19,10 +20,6 @@ function escapeHtml(value: string) {
 
 async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
   await syncStudyData().catch(() => undefined);
-  const today = await apiRequest<Today>("/study/today");
-  if (mode === "new" && !today.newUnlocked) {
-    throw new Error(`今天还有 ${today.mandatoryRemaining} 项必做复习，请先完成复习。`);
-  }
   const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
   const byId = new Map(words.map(word => [word.id, word]));
 
@@ -34,7 +31,10 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
     return { items: queue.words.map(word => ({ word })), total: queue.words.length };
   }
   if (mode === "mandatory") {
-    const items = today.review.map(card => ({ word: byId.get(card.wordId)!, card })).filter(item => item.word);
+    const queue = await apiRequest<ReviewQueue>("/study/review-queue");
+    const items = queue.words
+      .map(entry => ({ word: byId.get(entry.id) || entry, card: entry.card }))
+      .filter(item => item.word);
     return { items, total: items.length };
   }
 
