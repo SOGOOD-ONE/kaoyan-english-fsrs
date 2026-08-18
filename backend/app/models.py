@@ -106,6 +106,7 @@ class UserWordCard(db.Model):
     known_excluded = db.Column(db.Boolean, nullable=False, default=False)
     new_ec_correct = db.Column(db.Integer, nullable=False, default=0)
     new_ce_correct = db.Column(db.Integer, nullable=False, default=0)
+    new_complete = db.Column(db.Boolean, nullable=False, default=False)
     __table_args__ = (db.UniqueConstraint('user_id', 'word_id', name='uq_user_word_card'),)
 
 
@@ -140,6 +141,7 @@ class DailyPlan(db.Model):
     new_completed = db.Column(db.Integer, nullable=False, default=0)
     mandatory_total = db.Column(db.Integer, nullable=False, default=0)
     mandatory_completed = db.Column(db.Integer, nullable=False, default=0)
+    mandatory_source_date = db.Column(db.Date)
     self_total = db.Column(db.Integer, nullable=False, default=0)
     self_completed = db.Column(db.Integer, nullable=False, default=0)
     __table_args__ = (db.UniqueConstraint('user_id', 'plan_date', name='uq_user_plan_date'),)
