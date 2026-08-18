@@ -26,15 +26,16 @@ def today_due_cards(user):
 def get_or_create_plan(user):
     today = date.today()
     settings = UserSetting.query.filter_by(user_id=user.id).first()
+    quota = settings.daily_new_quota if settings else 100
+    review_quota = settings.daily_review_quota if settings else 100
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
     if not plan:
-        quota = settings.daily_new_quota if settings else 100
         due = today_due_cards(user)
         plan = DailyPlan(
             user_id=user.id,
             plan_date=today,
             new_quota=quota,
-            mandatory_total=len(due),
+            mandatory_total=min(len(due), review_quota),
             mandatory_completed=0,
         )
         db.session.add(plan)
