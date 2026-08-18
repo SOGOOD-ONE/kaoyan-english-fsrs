@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import Blueprint, jsonify
 
@@ -28,38 +28,36 @@ def card_json(card):
 @review_queue_api.get("/study/review-queue")
 @login_required
 def review_queue(user):
+    today = date.today()
     settings = UserSetting.query.filter_by(user_id=user.id).first()
     quota = int(settings.daily_review_quota if settings else 100)
-    plan = DailyPlan.query.filter_by(user_id=user.id).filter(
-        DailyPlan.plan_date == db.func.current_date()
-    ).first()
+    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
+    if not plan:
+        return jsonify({"date": today.isoformat(), "quota": quota, "completed": 0, "remaining": 0, "words": []})
 
     selected_ids = selected_word_ids(user)
-    if not selected_ids:
-        return jsonify({
-            "quota": quota,
-            "completed": int(plan.mandatory_completed if plan else 0),
-            "remaining": 0,
-            "words": [],
-        })
+    remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
+    if not selected_ids or remaining == 0:
+        return jsonify({"date": today.isoformat(), "quota": quota, "completed": plan.mandatory_completed, "remaining": remaining, "words": []})
 
-    query = UserWordCard.query.filter(
-        UserWordCard.user_id == user.id,
-        UserWordCard.word_id.in_(selected_ids),
-        UserWordCard.due_at <= datetime.utcnow(),
-        UserWordCard.state != "new",
+    due_cards = (
+        UserWordCard.query.filter(
+            UserWordCard.user_id == user.id,
+            UserWordCard.word_id.in_(selected_ids),
+            UserWordCard.due_at <= datetime.utcnow(),
+            UserWordCard.state != "new",
+        )
+        .order_by(UserWordCard.due_at.asc(), UserWordCard.last_review_at.asc(), UserWordCard.id.asc())
+        .limit(remaining)
+        .all()
     )
-    due_cards = query.order_by(UserWordCard.due_at.asc(), UserWordCard.id.asc()).all()
-    completed = int(plan.mandatory_completed if plan else 0)
-    remaining = max(0, min(quota, len(due_cards)) - completed)
-
-    queue = due_cards[:max(0, min(quota, len(due_cards)))]
-    words = Word.query.filter(Word.id.in_([card.word_id for card in queue])).all() if queue else []
+    words = Word.query.filter(Word.id.in_([card.word_id for card in due_cards])).all() if due_cards else []
     by_id = {word.id: word for word in words}
 
     return jsonify({
+        "date": today.isoformat(),
         "quota": quota,
-        "completed": completed,
+        "completed": plan.mandatory_completed,
         "remaining": remaining,
         "words": [
             {
@@ -71,7 +69,7 @@ def review_queue(user):
                 "source": by_id[card.word_id].source,
                 "card": card_json(card),
             }
-            for card in queue
+            for card in due_cards
             if card.word_id in by_id
         ],
     })
