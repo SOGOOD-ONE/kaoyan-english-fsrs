@@ -2,21 +2,25 @@
 (function(){
   const API='/api'; let authUser=null;
   const json=async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('API '+r.status));return d;};
+  const request=async(path,options={})=>json(await fetch(API+path,{credentials:'include',...options,headers:{'Content-Type':'application/json',...(options.headers||{})}}));
   window.V3API={
     async me(){const d=await json(await fetch(API+'/auth/me',{credentials:'include'}));authUser=d.user||null;return authUser;},
-    async login(email,password){const d=await json(await fetch(API+'/auth/login',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}));authUser=d.user;return authUser;},
-    async register(email,password,nickname){const d=await json(await fetch(API+'/auth/register',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,nickname})}));authUser=d.user;return authUser;},
-    async logout(){await json(await fetch(API+'/auth/logout',{method:'POST',credentials:'include'}));authUser=null;},
-    async settings(){return json(await fetch(API+'/settings',{credentials:'include'}));},
-    async saveSettings(data){return json(await fetch(API+'/settings',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}));},
-    async today(){return json(await fetch(API+'/study/today',{credentials:'include'}));},
-    async cards(){return json(await fetch(API+'/cards',{credentials:'include'}));},
-    async words(params){const q=params?('?'+new URLSearchParams(params).toString()):'';return json(await fetch(API+'/words'+q,{credentials:'include'}));},
-    async syncStudy(){return json(await fetch(API+'/sync/study',{credentials:'include'}));},
-    async review(payload){return json(await fetch(API+'/reviews',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}));},
-    async vocabularies(){return json(await fetch(API+'/vocabularies',{credentials:'include'}));},
-    async vocabulary(id){return json(await fetch(API+'/vocabularies/'+encodeURIComponent(id),{credentials:'include'}));},
-    async selectVocabulary(id,enabled){return json(await fetch(API+'/vocabularies/'+encodeURIComponent(id)+'/selection',{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})}));},
+    async login(email,password){const d=await request('/auth/login',{method:'POST',body:JSON.stringify({email,password})});authUser=d.user;return authUser;},
+    async register(email,password,nickname){const d=await request('/auth/register',{method:'POST',body:JSON.stringify({email,password,nickname})});authUser=d.user;return authUser;},
+    async logout(){await request('/auth/logout',{method:'POST'});authUser=null;},
+    async settings(){return request('/settings');},
+    async saveSettings(data){return request('/settings',{method:'PUT',body:JSON.stringify(data)});},
+    async today(){return request('/study/today');},
+    async progress(){return request('/study/today/progress');},
+    async cards(){return request('/cards');},
+    async card(id){return request('/cards/'+encodeURIComponent(id));},
+    async updateCard(id,data){return request('/cards/'+encodeURIComponent(id),{method:'PUT',body:JSON.stringify(data)});},
+    async words(params){const q=params?('?'+new URLSearchParams(params).toString()):'';return request('/words'+q);},
+    async syncStudy(){return request('/sync/study');},
+    async review(payload){return request('/reviews',{method:'POST',body:JSON.stringify(payload)});},
+    async vocabularies(){return request('/vocabularies');},
+    async vocabulary(id){return request('/vocabularies/'+encodeURIComponent(id));},
+    async selectVocabulary(id,enabled){return request('/vocabularies/'+encodeURIComponent(id)+'/selection',{method:'PUT',body:JSON.stringify({enabled})});},
     user(){return authUser;}
   };
   window.V3APIReady=window.V3API.me().catch(()=>null);
