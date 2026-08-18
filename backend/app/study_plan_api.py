@@ -105,6 +105,14 @@ def get_or_create_plan(user):
 
 
 def card_retrievability(card, now=None):
+    """Calculate FSRS memory retrievability (retention probability).
+    
+    Uses FSRS standard formula with target_retention = 0.9:
+    R = target_retention ^ (elapsed_days / stability)
+    
+    This is mathematically equivalent to: R = e^(-elapsed / stability * ln(1/0.9))
+    Matches frontend FSRS_CONFIG.request_retention = 0.9.
+    """
     if card.state != "review" or not card.last_review_at or card.stability <= 0:
         return 0.0
     now = now or datetime.utcnow()
