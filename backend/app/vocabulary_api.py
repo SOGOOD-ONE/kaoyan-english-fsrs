@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request, session
 from . import db
 from .models import User, Vocabulary, VocabularyWord, UserVocabulary, UserWordCard, Word, DailyPlan, UserSetting
 from .time_utils import local_today
+from .import_helpers import HEADER_ALIASES, first_field
 
 vocabulary_api = Blueprint("vocabulary_api", __name__)
 
@@ -98,11 +99,15 @@ def import_user_vocabulary(user):
     inserted = updated = linked = 0; seen = set(); response_words = []
     for item in words:
         if not isinstance(item, dict): continue
-        raw = str(item.get("word", "")).strip(); normalized = " ".join(raw.lower().split())
+        raw = first_field(item, HEADER_ALIASES["word"]) or str(item.get("word", "")).strip()
+        normalized = " ".join(raw.lower().split())
         if not normalized or normalized in seen: continue
         seen.add(normalized)
+        word_type = first_field(item, HEADER_ALIASES["type"]) or str(item.get("type", item.get("wordType", "")) or "").strip()
+        meaning = first_field(item, HEADER_ALIASES["meaning"]) or str(item.get("meaning", "") or "").strip()
+        category = first_field(item, HEADER_ALIASES["category"]) or str(item.get("category", "") or "").strip()
         word = Word.query.filter_by(normalized_word=normalized).first()
-        values = {"word_type": str(item.get("type", item.get("wordType", "")) or "").strip(), "meaning": str(item.get("meaning", "") or "").strip(), "category": str(item.get("category", "") or "").strip(), "source": "user_import", "source_detail": name}
+        values = {"word_type": word_type, "meaning": meaning, "category": category, "source": "user_import", "source_detail": name}
         if word:
             word.word_type = values["word_type"] or word.word_type; word.meaning = values["meaning"] or word.meaning; word.category = values["category"] or word.category; updated += 1
         else:
