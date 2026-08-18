@@ -103,6 +103,9 @@ class UserWordCard(db.Model):
     correct_count = db.Column(db.Integer, nullable=False, default=0)
     wrong_count = db.Column(db.Integer, nullable=False, default=0)
     review_count = db.Column(db.Integer, nullable=False, default=0)
+    known_excluded = db.Column(db.Boolean, nullable=False, default=False)
+    new_ec_correct = db.Column(db.Integer, nullable=False, default=0)
+    new_ce_correct = db.Column(db.Integer, nullable=False, default=0)
     __table_args__ = (db.UniqueConstraint('user_id', 'word_id', name='uq_user_word_card'),)
 
 
