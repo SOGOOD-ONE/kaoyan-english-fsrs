@@ -35,6 +35,7 @@ def create_app() -> Flask:
 
     from .api import api
     from .vocabulary_api import vocabulary_api
+    from .vocabulary_list_api import vocabulary_list_api
     from .history_api import history_api
     from .study_plan_api import study_plan_api
     from .review_quota_api import review_quota_api
@@ -44,6 +45,7 @@ def create_app() -> Flask:
     from .vocabulary_stats_api import vocabulary_stats_api
     app.register_blueprint(api, url_prefix="/api")
     app.register_blueprint(vocabulary_api, url_prefix="/api")
+    app.register_blueprint(vocabulary_list_api, url_prefix="/api")
     app.register_blueprint(history_api, url_prefix="/api")
     app.register_blueprint(study_plan_api, url_prefix="/api")
     app.register_blueprint(review_quota_api, url_prefix="/api")
