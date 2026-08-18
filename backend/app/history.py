@@ -1,12 +1,26 @@
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
-from .models import ReviewLog
+from .models import ReviewLog, UserSetting
+
+
+def user_zone(user_id):
+    settings = UserSetting.query.filter_by(user_id=user_id).first()
+    try:
+        return ZoneInfo(settings.timezone if settings and settings.timezone else "Asia/Shanghai")
+    except Exception:
+        return ZoneInfo("Asia/Shanghai")
 
 
 def build_history(user_id, days=30):
+    zone = user_zone(user_id)
+    local_now = datetime.now(timezone.utc).astimezone(zone)
+    local_today = local_now.date()
+    start_day = local_today - timedelta(days=max(1, min(days, 365)) - 1)
+    local_start = datetime.combine(start_day, datetime.min.time(), tzinfo=zone)
+    start = local_start.astimezone(timezone.utc).replace(tzinfo=None)
     end = datetime.utcnow()
-    start = end - timedelta(days=max(1, min(days, 365)))
     logs = ReviewLog.query.filter(
         ReviewLog.user_id == user_id,
         ReviewLog.reviewed_at >= start,
@@ -15,7 +29,7 @@ def build_history(user_id, days=30):
 
     daily = defaultdict(lambda: {"reviews": 0, "words": set(), "again": 0, "hard": 0, "good": 0, "easy": 0})
     for log in logs:
-        key = log.reviewed_at.date().isoformat()
+        key = log.reviewed_at.replace(tzinfo=timezone.utc).astimezone(zone).date().isoformat()
         row = daily[key]
         row["reviews"] += 1
         row["words"].add(log.word_id)
@@ -28,8 +42,6 @@ def build_history(user_id, days=30):
         elif log.rating == 4:
             row["easy"] += 1
 
-    # Only return dates on which the user actually studied.
-    # Empty calendar days are intentionally omitted from the history response.
     items = []
     for day, row in sorted(daily.items()):
         reviews = row["reviews"]
@@ -48,7 +60,7 @@ def build_history(user_id, days=30):
 
     review_dates = {item["date"] for item in items}
     streak = 0
-    cursor = end.date()
+    cursor = local_today
     while cursor.isoformat() in review_dates:
         streak += 1
         cursor -= timedelta(days=1)
