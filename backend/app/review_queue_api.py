@@ -1,9 +1,8 @@
-from datetime import datetime
-
 from flask import Blueprint, jsonify
 
-from .api import login_required, selected_word_ids
-from .models import DailyPlan, UserSetting, UserWordCard, Word
+from .api import login_required
+from .models import UserWordCard, Word
+from .study_plan_api import get_or_create_plan, mandatory_word_ids
 from .time_utils import local_today
 
 review_queue_api = Blueprint("review_queue_api", __name__)
@@ -29,48 +28,44 @@ def card_json(card):
 @login_required
 def review_queue(user):
     today = local_today(user)
-    settings = UserSetting.query.filter_by(user_id=user.id).first()
-    quota = int(settings.daily_review_quota if settings else 100)
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
-    if not plan:
-        return jsonify({"date": today.isoformat(), "quota": quota, "completed": 0, "remaining": 0, "words": []})
+    plan = get_or_create_plan(user)
+    source_ids, source_date = mandatory_word_ids(user, plan.mandatory_source_date)
+    remaining = max(0, len(source_ids) - plan.mandatory_completed)
+    if not source_ids or remaining == 0:
+        return jsonify({
+            "date": today.isoformat(),
+            "sourceDate": source_date.isoformat(),
+            "refreshHour": 6,
+            "quota": None,
+            "completed": plan.mandatory_completed,
+            "remaining": remaining,
+            "words": [],
+        })
 
-    selected_ids = selected_word_ids(user)
-    remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
-    if not selected_ids or remaining == 0:
-        return jsonify({"date": today.isoformat(), "quota": quota, "completed": plan.mandatory_completed, "remaining": remaining, "words": []})
-
-    due_cards = (
-        UserWordCard.query.filter(
-            UserWordCard.user_id == user.id,
-            UserWordCard.word_id.in_(selected_ids),
-            UserWordCard.known_excluded.is_(False),
-            UserWordCard.due_at <= datetime.utcnow(),
-            UserWordCard.state != "new",
-        )
-        .order_by(UserWordCard.due_at.asc(), UserWordCard.last_review_at.asc(), UserWordCard.id.asc())
-        .limit(remaining)
-        .all()
-    )
-    words = Word.query.filter(Word.id.in_([card.word_id for card in due_cards])).all() if due_cards else []
-    by_id = {word.id: word for word in words}
-
+    cards = UserWordCard.query.filter(
+        UserWordCard.user_id == user.id,
+        UserWordCard.word_id.in_(source_ids),
+        UserWordCard.known_excluded.is_(False),
+    ).order_by(UserWordCard.last_review_at.asc(), UserWordCard.id.asc()).all()
+    by_id = {word.id: word for word in Word.query.filter(Word.id.in_([c.word_id for c in cards])).all()} if cards else {}
+    words = [
+        {
+            "id": by_id[card.word_id].id,
+            "word": by_id[card.word_id].word,
+            "type": by_id[card.word_id].word_type,
+            "meaning": by_id[card.word_id].meaning,
+            "category": by_id[card.word_id].category,
+            "source": by_id[card.word_id].source,
+            "card": card_json(card),
+        }
+        for card in cards if card.word_id in by_id
+    ]
     return jsonify({
         "date": today.isoformat(),
-        "quota": quota,
+        "sourceDate": source_date.isoformat(),
+        "refreshHour": 6,
+        "quota": None,
         "completed": plan.mandatory_completed,
         "remaining": remaining,
-        "words": [
-            {
-                "id": by_id[card.word_id].id,
-                "word": by_id[card.word_id].word,
-                "type": by_id[card.word_id].word_type,
-                "meaning": by_id[card.word_id].meaning,
-                "category": by_id[card.word_id].category,
-                "source": by_id[card.word_id].source,
-                "card": card_json(card),
-            }
-            for card in due_cards
-            if card.word_id in by_id
-        ],
+        "words": words,
     })
