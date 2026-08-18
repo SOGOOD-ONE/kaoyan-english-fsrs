@@ -93,6 +93,7 @@ def answer_new_word(user):
     if direction != expected_direction:
         return jsonify({"error": "wrong_learning_stage", "expectedDirection": expected_direction, "card": card_json(card)}), 409
 
+    correct_answer = word.word if direction == "ce" else word.meaning
     card.new_attempts = attempts + 1
     if correct:
         if direction == "ec":
@@ -104,7 +105,15 @@ def answer_new_word(user):
         card.new_complete = True
         card.first_learned_at = card.first_learned_at or datetime.utcnow()
     db.session.commit()
-    return jsonify({"ok": True, "correct": correct, "expectedDirection": "ce" if card.new_attempts >= 2 else "ec", "completed": completed, "card": card_json(card)})
+    return jsonify({
+        "ok": True,
+        "correct": correct,
+        "correctAnswer": correct_answer,
+        "direction": direction,
+        "expectedDirection": "ce" if card.new_attempts >= 2 else "ec",
+        "completed": completed,
+        "card": card_json(card),
+    })
 
 
 @study_new_api.post("/study/known-exclude")
