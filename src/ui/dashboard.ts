@@ -1,4 +1,5 @@
 import { apiRequest } from "../services/api";
+import { renderNav } from "./nav";
 
 type Overview = { totalWords: number; learnedWords: number; reviewedWords: number; masteredWords: number; remainingWords: number; progressPercent: number };
 type StudyTime = { todaySeconds: number; totalSeconds: number; activeSessionId?: string | null };
@@ -34,7 +35,7 @@ export async function mountDashboard(root: HTMLElement) {
       <div class="dashboard-shell">
         <header class="dashboard-header">
           <div><div class="dashboard-date">${formatDate()}</div><div class="dashboard-brand">考研英语核心词</div><div class="dashboard-subtitle">FSRS-6 智能学习系统</div></div>
-          <div class="dashboard-account"><span class="dashboard-user">${user.nickname}</span><a href="/settings">设置</a><button id="dashboard-logout" type="button">退出登录</button></div>
+          <div class="dashboard-account"><span class="dashboard-user">${user.nickname}</span>${renderNav("/")}</div>
         </header>
         <main>
           <section class="dashboard-progress-card">
@@ -46,7 +47,7 @@ export async function mountDashboard(root: HTMLElement) {
           </section>
           <section class="dashboard-time-grid"><div class="dashboard-time-card"><span>今日学习时长</span><strong>${formatDuration(time.todaySeconds)}</strong></div><div class="dashboard-time-card"><span>总学习时长</span><strong>${formatDuration(time.totalSeconds)}</strong></div><div class="dashboard-time-card"><span>活跃天数</span><strong>${activeDays}</strong></div></section>
           <section class="dashboard-actions">
-            <a class="study-action review-required" href="/study/review"><span class="study-action-title">${reviewRequired ? "复习昨日新词" : "复习昨日新词"}</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项 · ${today.mandatorySourceDate || "昨日"}` : reviewLabel}</span><span class="study-action-arrow">→</span></a>
+            <a class="study-action review-required" href="/study/review"><span class="study-action-title">复习昨日新词</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项 · ${today.mandatorySourceDate || "昨日"}` : reviewLabel}</span><span class="study-action-arrow">→</span></a>
             ${reviewRequired || newRemaining === 0
               ? `<div class="study-action locked" aria-disabled="true"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">${reviewRequired ? "🔒" : "✓"}</span></div>`
               : `<a class="study-action" href="/study/new"><span class="study-action-title">学习新词</span><span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span><span class="study-action-arrow">→</span></a>`}
@@ -54,7 +55,6 @@ export async function mountDashboard(root: HTMLElement) {
           </section>
         </main>
       </div>`;
-    document.getElementById("dashboard-logout")?.addEventListener("click", async () => { const button = document.getElementById("dashboard-logout") as HTMLButtonElement | null; if (button) { button.disabled = true; button.textContent = "退出中…"; } try { await apiRequest("/auth/logout", { method: "POST" }); } finally { location.href = "/login"; } });
   } catch (error) {
     root.innerHTML = `<div class="dashboard-shell"><div class="dashboard-error"><h2>学习数据加载失败</h2><p>${error instanceof Error ? error.message : "请刷新页面后重试。"}</p></div></div>`;
   }
