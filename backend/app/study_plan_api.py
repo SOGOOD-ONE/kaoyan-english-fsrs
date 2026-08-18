@@ -48,6 +48,21 @@ def mandatory_word_ids(user, source_date=None):
     return ids - excluded, source_date
 
 
+def mandatory_completed_ids(user, source_ids=None):
+    today = local_today(user)
+    start = local_day_start_utc(user, today)
+    end = local_day_end_utc(user, today)
+    query = ReviewLog.query.filter(
+        ReviewLog.user_id == user.id,
+        ReviewLog.review_type == "mandatory",
+        ReviewLog.reviewed_at >= start,
+        ReviewLog.reviewed_at <= end,
+    )
+    if source_ids:
+        query = query.filter(ReviewLog.word_id.in_(source_ids))
+    return {row[0] for row in query.with_entities(ReviewLog.word_id).distinct().all()}
+
+
 def get_or_create_plan(user):
     today = local_today(user)
     source_date = mandatory_source_date(user)
@@ -57,13 +72,15 @@ def get_or_create_plan(user):
     plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
     source_ids, source_date = mandatory_word_ids(user, source_date)
     source_total = len(source_ids)
+    completed_ids = mandatory_completed_ids(user, source_ids)
+    completed_total = len(completed_ids)
     if not plan:
         plan = DailyPlan(
             user_id=user.id,
             plan_date=today,
             new_quota=new_quota,
             mandatory_total=source_total,
-            mandatory_completed=0,
+            mandatory_completed=min(source_total, completed_total),
             mandatory_source_date=source_date,
             self_total=self_quota,
             self_completed=0,
@@ -73,13 +90,14 @@ def get_or_create_plan(user):
     elif plan.mandatory_source_date != source_date:
         plan.mandatory_source_date = source_date
         plan.mandatory_total = source_total
-        plan.mandatory_completed = 0
+        plan.mandatory_completed = min(source_total, completed_total)
         plan.self_total = self_quota
         plan.self_completed = 0
         plan.new_quota = new_quota
         db.session.commit()
     else:
         plan.mandatory_total = source_total
+        plan.mandatory_completed = min(source_total, completed_total)
         plan.new_quota = new_quota
         plan.self_total = self_quota
         db.session.commit()
@@ -156,7 +174,7 @@ def record_today_progress(user):
     field = {"new": "new_completed", "mandatory": "mandatory_completed", "self": "self_completed"}[mode]
     setattr(plan, field, int(getattr(plan, field) or 0) + 1)
     if mode == "mandatory":
-        plan.mandatory_completed = min(plan.mandatory_completed, plan.mandatory_total)
+        plan.mandatory_completed = min(plan.mandatory_total, plan.mandatory_completed + 1)
     if mode == "self":
         settings = UserSetting.query.filter_by(user_id=user.id).first()
         plan.self_total = settings.daily_review_quota if settings else plan.self_total
