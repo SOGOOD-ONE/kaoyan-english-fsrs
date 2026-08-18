@@ -111,7 +111,18 @@ def import_user_vocabulary(user):
         if word:
             word.word_type = values["word_type"] or word.word_type; word.meaning = values["meaning"] or word.meaning; word.category = values["category"] or word.category; updated += 1
         else:
-            word = Word(word=raw, normalized_word=normalized, **values); db.session.add(word); db.session.flush(); inserted += 1
+            # Sanitize input: strip HTML, limit length
+            clean_word = raw.strip()[:100]  # max 100 chars
+            clean_meaning = str(values.get("meaning", "")).strip()[:500]  # max 500 chars
+            clean_type = str(values.get("word_type", "")).strip()[:50]
+            clean_category = str(values.get("category", "")).strip()[:100]
+            word = Word(
+                word=clean_word,
+                normalized_word=normalized,
+                meaning=clean_meaning,
+                word_type=clean_type,
+                category=clean_category
+            ); db.session.add(word); db.session.flush(); inserted += 1
         membership = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id, word_id=word.id).first()
         if not membership: db.session.add(VocabularyWord(vocabulary_id=vocabulary.id, word_id=word.id, priority=50)); linked += 1
         response_words.append({"id": word.id, "word": word.word, "meaning": word.meaning, "type": word.word_type, "category": word.category})
