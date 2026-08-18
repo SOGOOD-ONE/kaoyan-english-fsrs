@@ -1,0 +1,81 @@
+name: Wire V3 UI to authenticated backend
+on:
+  push:
+    paths:
+      - 'v3-api-bridge.js'
+      - '.github/workflows/wire-v3-ui.yml'
+permissions:
+  contents: write
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire backend auth and sync into V3 index
+        env:
+          FILE: index.html
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8-sig')
+          bridge='<script src="v3-api-bridge.js"></script>'
+          if bridge not in s:
+              marker='<script src="data.js"></script>'
+              s=s.replace(marker, marker+'\n'+bridge, 1)
+          runtime=r'''<script>
+          (function(){
+            const wait=window.V3APIReady||Promise.resolve(null);
+            const api=()=>window.V3API;
+            const esc=s=>String(s??'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[m]));
+            function backendLoginView(){
+              const box=document.getElementById('view-login'); if(!box)return;
+              box.innerHTML=`<div class="login-container"><div class="login-title">考研英语核心词</div><div class="login-subtitle">登录后同步你的学习进度</div><input class="login-input" id="auth-email" type="email" placeholder="邮箱"><input class="login-input" id="auth-password" type="password" placeholder="密码（至少8位）"><input class="login-input" id="auth-nickname" type="text" placeholder="昵称（注册时填写）" maxlength="20"><button class="login-btn" id="auth-submit">登录</button><button class="logout-btn" id="auth-switch">没有账号？注册</button><div class="login-hint" id="auth-hint">学习数据与账号绑定</div></div>`;
+              let register=false;
+              const nick=box.querySelector('#auth-nickname'); nick.style.display='none';
+              box.querySelector('#auth-switch').onclick=()=>{register=!register;nick.style.display=register?'block':'none';box.querySelector('#auth-submit').textContent=register?'注册并开始学习':'登录';box.querySelector('#auth-switch').textContent=register?'已有账号？登录':'没有账号？注册'};
+              box.querySelector('#auth-submit').onclick=async()=>{
+                const email=box.querySelector('#auth-email').value.trim(), password=box.querySelector('#auth-password').value, nickname=nick.value.trim()||'考研用户';
+                if(!email||!password){showToast('请填写邮箱和密码');return;}
+                const btn=box.querySelector('#auth-submit');btn.disabled=true;
+                try{const user=register?await api().register(email,password,nickname):await api().login(email,password);window.currentUser=String(user.id);if(window.storageAvailable)try{localStorage.setItem('currentUser',String(user.id))}catch(e){};await backendBootstrap(user);}
+                catch(e){showToast(e.message==='password_too_short'?'密码至少8位':e.message==='email_exists'?'邮箱已注册':e.message==='invalid_credentials'?'邮箱或密码错误':'操作失败，请重试');}
+                finally{btn.disabled=false;}
+              };
+            }
+            async function backendBootstrap(user){
+              try{window.currentUser=String(user.id);await window.loadProgressFromDB?.();await syncDown();window.renderHome();window.showView('home');}
+              catch(e){window.renderHome();window.showView('home');}
+            }
+            async function syncDown(){
+              if(!api()||!window.progress)return;
+              const [words,cards]=await Promise.all([api().words({selectedOnly:'0',limit:'500'}),api().cards()]);
+              const byId=new Map(words.map(w=>[String(w.id),w]));
+              for(const c of cards){const w=byId.get(String(c.wordId));if(!w)continue;const old=progress.words[w.word]||{};progress.words[w.word]={...old,status:c.state==='New'?'new':'review',fsrsState:c.state,stability:Number(c.stability||0),difficulty:Number(c.difficulty||0),nextReview:c.dueAt?new Date(c.dueAt).getTime():old.nextReview,lastReview:c.lastReviewAt?new Date(c.lastReviewAt).getTime():old.lastReview,correct:Number(c.correctCount||old.correct||0),wrong:Number(c.wrongCount||old.wrong||0),fsrs:old.fsrs};}
+              saveProgress();
+            }
+            let syncTimer=0;
+            const originalSave=window.saveProgress;
+            if(originalSave){window.saveProgress=function(){originalSave.apply(this,arguments);clearTimeout(syncTimer);syncTimer=setTimeout(syncUp,900);};}
+            async function syncUp(){
+              if(!api()||!api().user()||!window.progress)return;
+              try{const words=await api().words({selectedOnly:'0',limit:'500'});const byWord=new Map(words.map(w=>[w.word,w.id]));for(const [word,wp] of Object.entries(progress.words||{})){const id=byWord.get(word);if(!id||wp.status==='ignored')continue;await fetch('/api/cards/'+encodeURIComponent(id),{method:'PUT',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({state:wp.fsrsState||'Review',stability:wp.stability||0,difficulty:wp.difficulty||0,dueAt:wp.nextReview?new Date(wp.nextReview).toISOString():new Date().toISOString(),lastReviewAt:wp.lastReview?new Date(wp.lastReview).toISOString():null,correctCount:wp.correct||0,wrongCount:wp.wrong||0,reviewCount:(wp.correct||0)+(wp.wrong||0)})});}}
+              catch(e){}
+            }
+            const originalLogout=window.logout;
+            window.logout=async function(){try{await api().logout();}catch(e){};if(originalLogout)originalLogout();else location.reload();};
+            window.V3Backend={bootstrap:backendBootstrap,syncDown,syncUp};
+            wait.then(async user=>{if(user){window.currentUser=String(user.id);await backendBootstrap(user);}else{window.renderLogin=backendLoginView;backendLoginView();}}).catch(()=>{window.renderLogin=backendLoginView;backendLoginView();});
+          })();
+          </script>'''
+          if 'window.V3Backend={bootstrap:backendBootstrap' not in s:
+              s=s.replace('</body>',runtime+'\n</body>',1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit wired index
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'feat: wire V3 UI to user auth and study APIs'
+          git push
