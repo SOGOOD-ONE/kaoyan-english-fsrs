@@ -56,13 +56,18 @@ def create_app() -> Flask:
     if len(secret_key) < 32:
         raise RuntimeError("SECRET_KEY must be at least 32 characters long")
 
+    cookie_secure = os.getenv("COOKIE_SECURE", "0") == "1"
+    cookie_samesite_none = os.getenv("COOKIE_SAMESITE_NONE", "0") == "1"
+    if cookie_samesite_none and not cookie_secure:
+        raise RuntimeError("COOKIE_SAMESITE_NONE=1 requires COOKIE_SECURE=1")
+
     app.config.update(
         SECRET_KEY=secret_key,
         SQLALCHEMY_DATABASE_URI=os.getenv("DATABASE_URL", "sqlite:///kaoyan.db"),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="None" if os.getenv("COOKIE_SAMESITE_NONE", "0") == "1" else "Lax",
-        SESSION_COOKIE_SECURE=os.getenv("COOKIE_SECURE", "0") == "1",
+        SESSION_COOKIE_SAMESITE="None" if cookie_samesite_none else "Lax",
+        SESSION_COOKIE_SECURE=cookie_secure,
     )
 
     db.init_app(app)
