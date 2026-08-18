@@ -23,6 +23,21 @@ function escapeHtml(value: string) {
 
 function shuffle<T>(values: T[]) { return [...values].sort(() => Math.random() - 0.5); }
 function newDirection(card: NewCard): Direction { return card.newEcCorrect >= 2 ? "ce" : "ec"; }
+
+function speakEnglish(text: string) {
+  if (!text.trim() || typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  try {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    window.speechSynthesis.speak(utterance);
+  } catch {
+    // 浏览器不支持时静默降级，不影响学习流程。
+  }
+}
+
 function buildNewOptions(items: NewQueueWord[], current: NewQueueWord, direction: Direction) {
   const correct = direction === "ec" ? current.meaning : current.word;
   const pool = items.filter(item => item.id !== current.id).map(item => direction === "ec" ? item.meaning : item.word).filter(value => value && value !== correct);
@@ -116,6 +131,8 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           const correctAnswer = direction === "ec" ? current.meaning : current.word;
           const correct = selected === correctAnswer;
           try {
+            if (direction === "ce") speakEnglish(selected);
+            if (direction === "ec" && correct) speakEnglish(current.word);
             const result = await apiRequest<{ completed: boolean; card: NewCard }>("/study/new-answer", { method: "POST", body: JSON.stringify({ wordId: current.id, direction, correct }) });
             current.card = result.card;
             if (!correct) { renderNew("再试一次"); return; }
@@ -166,13 +183,20 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
         } catch { window.alert("无法保存，请重试"); }
         return;
       }
-      if (target.closest("#study-reveal")) { answerVisible = !answerVisible; render(); return; }
+      if (target.closest("#study-reveal")) {
+        const willShow = !answerVisible;
+        answerVisible = willShow;
+        render();
+        if (willShow) speakEnglish(items[index].word.word);
+        return;
+      }
       if (actionElement?.dataset.action === "rating") {
         const button = actionElement as HTMLButtonElement;
         try {
           const value = Number(button.dataset.rating);
           const rating = [Rating.Again, Rating.Hard, Rating.Good, Rating.Easy][value - 1] as Grade;
           const item = items[index];
+          speakEnglish(item.word.word);
           const result = await review(item.word, rating);
           const reviewRows = await store.getReviews(item.word.id);
           const saved = reviewRows.find(row => row.id === result.reviewId);
@@ -188,6 +212,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
       }
     });
   } catch (error) {
-    root.innerHTML = `<main class="study-page"><section class="study-error"><h2>学习内容加载失败</h2><p>${escapeHtml(error instanceof Error ? error.message : "请刷新页面后重试")}</p><a href="/">返回首页</a></section></main>`;
+    root.innerHTML = `<main class="study-page"><section class="study-error"><h2>学习内容加载失败</h2><p>${escapeHtml(error instanceof Error ? error.message : "请刷新页面后重试。")}</p></section></main>`;
   }
 }
