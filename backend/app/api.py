@@ -54,6 +54,15 @@ def parse_client_datetime(value, fallback=None):
         return fallback or datetime.utcnow()
 
 
+def parse_sync_since(value):
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
 def visible_vocabulary_filter(user):
     return (Vocabulary.kind == "system") | (Vocabulary.owner_user_id == user.id)
 
@@ -202,11 +211,35 @@ def upsert_card(user, word_id):
 @api.get("/sync/study")
 @login_required
 def sync_study(user):
-    cards = UserWordCard.query.filter_by(user_id=user.id).all()
-    logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
-    return jsonify({"cards": [card_json(c) for c in cards],
-                    "reviews": [{"id": r.id, "wordId": r.word_id, "rating": r.rating,
-                                 "reviewedAt": r.reviewed_at.isoformat(), "reviewType": r.review_type} for r in logs]})
+    since = parse_sync_since(request.args.get("since"))
+    if since is None:
+        cards = UserWordCard.query.filter_by(user_id=user.id).all()
+        logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
+    else:
+        logs = ReviewLog.query.filter(
+            ReviewLog.user_id == user.id,
+            ReviewLog.reviewed_at > since,
+        ).order_by(ReviewLog.reviewed_at.asc()).all()
+        changed_word_ids = {row.word_id for row in logs}
+        changed_word_ids.update(
+            row.word_id for row in UserWordCard.query.filter(
+                UserWordCard.user_id == user.id,
+                UserWordCard.last_review_at.isnot(None),
+                UserWordCard.last_review_at > since,
+            ).all()
+        )
+        cards = UserWordCard.query.filter(
+            UserWordCard.user_id == user.id,
+            UserWordCard.word_id.in_(changed_word_ids),
+        ).all() if changed_word_ids else []
+
+    server_now = datetime.utcnow()
+    return jsonify({
+        "cards": [card_json(c) for c in cards],
+        "reviews": [{"id": r.id, "wordId": r.word_id, "rating": r.rating,
+                     "reviewedAt": r.reviewed_at.isoformat(), "reviewType": r.review_type} for r in logs],
+        "serverNow": server_now.isoformat(),
+    })
 
 
 @api.get("/words")
@@ -377,42 +410,9 @@ def set_vocabulary_selection(user, vocabulary_id):
     enabled = bool(data.get("enabled", True))
     row = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary_id).first()
     if not row:
-        row = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary_id,
-                             enabled=enabled, priority=vocabulary.priority)
+        row = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary_id, enabled=enabled, priority=vocabulary.priority)
         db.session.add(row)
     else:
         row.enabled = enabled
     db.session.commit()
-    return jsonify({"id": vocabulary_id, "enabled": row.enabled})
-
-
-@api.get("/vocabularies/<vocabulary_id>")
-@login_required
-def vocabulary_detail(user, vocabulary_id):
-    vocabulary = vocabulary_is_visible(user, vocabulary_id)
-    if not vocabulary:
-        return jsonify({"error": "not_found"}), 404
-    links = VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).order_by(VocabularyWord.priority.desc(), VocabularyWord.created_at.asc()).all()
-    word_ids = [link.word_id for link in links]
-    word_map = {w.id: w for w in Word.query.filter(Word.id.in_(word_ids)).all()} if word_ids else {}
-    return jsonify({"id": vocabulary.id, "name": vocabulary.name, "kind": vocabulary.kind,
-                    "priority": vocabulary.priority, "description": vocabulary.description,
-                    "wordCount": len(word_ids),
-                    "words": [{"id": w.id, "word": w.word, "type": w.word_type, "meaning": w.meaning,
-                               "category": w.category, "priority": link.priority}
-                              for link in links if (w := word_map.get(link.word_id))]})
-
-
-@api.get("/vocabularies/<vocabulary_id>/stats")
-@login_required
-def vocabulary_stats(user, vocabulary_id):
-    vocabulary = vocabulary_is_visible(user, vocabulary_id)
-    if not vocabulary:
-        return jsonify({"error": "not_found"}), 404
-    word_ids = {link.word_id for link in VocabularyWord.query.filter_by(vocabulary_id=vocabulary.id).all()}
-    cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all() if word_ids else []
-    learned = [c for c in cards if c.review_count > 0]
-    due = [c for c in learned if c.due_at <= datetime.utcnow()]
-    return jsonify({"vocabularyId": vocabulary.id, "wordCount": len(word_ids), "learned": len(learned),
-                    "due": len(due), "new": len(word_ids) - len(learned),
-                    "masteryRate": round(len([c for c in learned if c.state == "review"]) / len(word_ids) * 100, 1) if word_ids else 0})
+    return jsonify({"vocabularyId": vocabulary_id, "enabled": row.enabled})
