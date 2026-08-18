@@ -66,5 +66,5 @@ async function bootstrap() {
 
 void bootstrap().catch((error) => {
   console.error(error);
-  appRoot.innerHTML = `<main style="padding:24px;font-family:system-ui"><h1>应用启动失败</h1><p>请刷新页面后重试。</p></p></main>`;
+  appRoot.innerHTML = `<main style="padding:24px;font-family:system-ui"><h1>应用启动失败</h1><p>请刷新页面后重试。</p></main>`;
 });
