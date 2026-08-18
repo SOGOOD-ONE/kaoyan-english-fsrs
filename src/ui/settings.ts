@@ -1,5 +1,6 @@
 import { apiRequest } from "../services/api";
 import { renderNav } from "./nav";
+import { store } from "../db/db";
 
 type Settings = { dailyNewQuota: number; timezone: string; soundEnabled: boolean; autoPlayExample: boolean };
 type ReviewQuota = { dailyReviewQuota: number };
@@ -35,7 +36,7 @@ export async function mountSettings(root: HTMLElement) {
       <label class="setting-row"><div><strong>提示音</strong><small>完成一次评分后播放提示音</small></div><input id="sound-enabled" type="checkbox" ${settings.soundEnabled ? "checked" : ""}></label>
       <label class="setting-row"><div><strong>自动播放例句</strong><small>查看释义后自动播放例句</small></div><input id="auto-play-example" type="checkbox" ${settings.autoPlayExample ? "checked" : ""}></label>
     </section>
-    <section class="panel settings-section"><div class="settings-title"><strong>学习数据</strong><span>谨慎操作；重置会清除当前账号的 FSRS 卡片和复习记录。</span></div>
+    <section class="panel settings-section"><div class="settings-title"><strong>学习数据</strong><span>谨慎操作；重置会清除当前账号的 FSRS 卡片、复习记录、学习时长和学习历史。</span></div>
       <div class="settings-actions"><button id="reset-progress" type="button">重置学习进度</button><span id="reset-status"></span></div>
     </section>
     <section class="panel settings-section"><div class="settings-actions"><button id="save-settings" type="button">保存设置</button><span id="save-status"></span></div></section></main>`;
@@ -75,14 +76,18 @@ export async function mountSettings(root: HTMLElement) {
 
   document.getElementById("reset-progress")?.addEventListener("click", async () => {
     const status = document.getElementById("reset-status")!;
-    if (!window.confirm("确定重置当前账号的学习进度吗？词库和账号不会删除，但 FSRS 卡片、复习记录和学习时长会被清除。")) return;
+    if (!window.confirm("确定重置当前账号的学习进度吗？账号、词库选择和每日数量设置不会删除，但 FSRS 卡片、复习记录、学习时长和学习历史会清除。")) return;
     status.textContent = "重置中…";
+    const button = document.getElementById("reset-progress") as HTMLButtonElement | null;
+    if (button) button.disabled = true;
     try {
       await apiRequest("/study/reset", { method: "POST" });
+      await store.clearStudyState();
       status.textContent = "已重置";
       window.setTimeout(() => location.href = "/", 800);
     } catch {
       status.textContent = "重置失败，请稍后再试";
+      if (button) button.disabled = false;
     }
   });
 }
