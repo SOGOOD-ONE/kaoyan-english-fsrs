@@ -1,4 +1,4 @@
-import { createEmptyCard, type Card } from "ts-fsrs";
+import { createEmptyCard, State, type Card } from "ts-fsrs";
 import { apiRequest } from "./api";
 import { store } from "../db/db";
 
@@ -16,7 +16,16 @@ interface ServerCard {
 
 function restoreCard(row: ServerCard): Card {
   const card = createEmptyCard();
-  card.state = typeof row.state === "number" ? row.state : Number(row.state);
+  const rawState = row.state;
+  const normalizedState = typeof rawState === "string" ? rawState.trim().toLowerCase() : "";
+  const stateMap: Record<string, Card["state"]> = {
+    new: State.New,
+    learning: State.Learning,
+    review: State.Review,
+    relearning: State.Relearning,
+  };
+  const numericState = typeof rawState === "number" && Number.isFinite(rawState) ? rawState : undefined;
+  card.state = numericState ?? stateMap[normalizedState] ?? State.New;
   card.stability = Number(row.stability || 0);
   card.difficulty = Number(row.difficulty || 0);
   card.due = new Date(row.dueAt);
