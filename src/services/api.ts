@@ -1,3 +1,5 @@
+import { setStoreUser } from "../db/db";
+
 export const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 function ensureRandomUUID() {
@@ -15,6 +17,7 @@ function ensureRandomUUID() {
 ensureRandomUUID();
 
 type ReviewIdentity = { id: string; wordId: string; reviewedAt: number };
+type AuthUser = { id?: string | number; [key: string]: unknown };
 
 function alignReviewIdentity(path: string, init?: RequestInit): RequestInit | undefined {
   if (!init?.body || path !== "/reviews" || typeof init.body !== "string") return init;
@@ -43,7 +46,14 @@ async function afterAuthenticatedReview(path: string, payload: unknown) {
 }
 
 async function afterAuthMe(user: unknown) {
-  if (!user || typeof user !== "object") return;
+  if (!user || typeof user !== "object") {
+    setStoreUser(null);
+    return;
+  }
+  const authUser = user as AuthUser;
+  if (authUser.id !== undefined && authUser.id !== null) setStoreUser(String(authUser.id));
+  else setStoreUser(null);
+
   try {
     const response = await fetch(`${API_BASE_URL}/settings`, { credentials: "include" });
     if (response.ok) {
@@ -65,10 +75,11 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     throw new Error(String(body.error || `API ${response.status}`));
   }
   const result = await response.json() as T;
-  if (normalizedPath === "/auth/me") {
+  if (normalizedPath === "/auth/me" || normalizedPath === "/auth/login" || normalizedPath === "/auth/register") {
     const user = (result as { user?: unknown }).user;
-    if (user) await afterAuthMe(user);
+    await afterAuthMe(user);
   }
+  if (normalizedPath === "/auth/logout") setStoreUser(null);
   if (normalizedPath === "/reviews" && requestInit?.body) {
     try { void afterAuthenticatedReview(normalizedPath, JSON.parse(String(requestInit.body))); } catch {}
   }
