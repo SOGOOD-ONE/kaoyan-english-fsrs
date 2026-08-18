@@ -31,10 +31,10 @@ function patchSpeechRate() {
     const synthesis = window.speechSynthesis;
     const originalSpeak = synthesis.speak.bind(synthesis);
     synthesis.speak = (utterance: SpeechSynthesisUtterance) => {
-      utterance.rate = 0.65;
+      utterance.rate = 0.75;
       let resolveSpeech!: () => void;
       speechCompletion = new Promise<void>(resolve => { resolveSpeech = resolve; });
-      const finish = () => window.setTimeout(resolveSpeech, 450);
+      const finish = () => window.setTimeout(resolveSpeech, 0);
       utterance.addEventListener("end", finish, { once: true });
       utterance.addEventListener("error", finish, { once: true });
       originalSpeak(utterance);
@@ -123,7 +123,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const result = await response.json() as T;
   if (selectionPath(normalizedPath)) {
     await speechCompletion.catch(() => undefined);
-    await sleep(350);
+    await sleep(100);
   }
   if (normalizedPath === "/auth/me" || normalizedPath === "/auth/login" || normalizedPath === "/auth/register") {
     const user = (result as { user?: unknown }).user;
