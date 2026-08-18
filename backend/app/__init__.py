@@ -59,6 +59,7 @@ def create_app() -> Flask:
 
     cookie_secure = os.getenv("COOKIE_SECURE", "0") == "1"
     cookie_samesite_none = os.getenv("COOKIE_SAMESITE_NONE", "0") == "1"
+    cookie_samesite_strict = os.getenv("COOKIE_SAMESITE_STRICT", "true").lower() == "true"
     if cookie_samesite_none and not cookie_secure:
         raise RuntimeError("COOKIE_SAMESITE_NONE=1 requires COOKIE_SECURE=1")
 
