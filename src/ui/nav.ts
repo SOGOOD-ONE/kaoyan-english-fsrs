@@ -23,10 +23,10 @@ export function installNavActions() {
     try {
       await apiRequest("/auth/logout", { method: "POST" });
     } catch {
-      // Even if the network request fails, never leave the previous user's local scope active.
+      // Session cleanup below is still required when the network request fails.
     } finally {
       setStoreUser(null);
-      location.href = "/kaoyan-english-fsrs/login";
+      location.href = "/login";
     }
   });
 }
