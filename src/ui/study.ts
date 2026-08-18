@@ -13,7 +13,7 @@ type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; revie
 type Item = { word: ServerWord; card?: ServerCard };
 
 function escapeHtml(value: string) {
-  return value.replace(/[&<>'"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]!));
+  return value.replace(/[&<>'\"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '\"': "&quot;" }[ch]!));
 }
 
 async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> {
@@ -45,6 +45,18 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
   return { items, total: items.length };
 }
 
+async function stopSession(sessionId: string) {
+  try {
+    await fetch(`/api/study/session/${encodeURIComponent(sessionId)}/stop`, {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+    });
+  } catch {
+    // Browser shutdowns can abort the request; the server also closes stale sessions on the next start.
+  }
+}
+
 export async function mountStudy(root: HTMLElement, mode: Mode) {
   root.innerHTML = `<div class="study-page"><div class="study-loading">正在加载学习内容…</div></div>`;
   try {
@@ -59,6 +71,9 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
     let index = 0;
     let answerVisible = false;
     const session = await apiRequest<{ sessionId: string }>("/study/session/start", { method: "POST", body: JSON.stringify({ mode }) });
+
+    const handlePageHide = () => { void stopSession(session.sessionId); };
+    window.addEventListener("pagehide", handlePageHide, { once: true });
 
     const render = () => {
       const item = items[index];
@@ -77,13 +92,16 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
           const result = await review(item.word, rating);
           const reviewRows = await store.getReviews(item.word.id);
           const saved = reviewRows.find(row => row.id === result.reviewId);
-          if (saved) {
-            saved.reviewType = reviewType;
-            await uploadReview(saved);
-          }
-          await apiRequest("/study/today/progress", { method: "POST", body: JSON.stringify({ mode: reviewType }) });
+          if (!saved) throw new Error("学习记录保存失败，请重试");
+          saved.reviewType = reviewType;
+          await uploadReview(saved);
+
           index += 1;
           answerVisible = false;
+          if (index >= total) {
+            await stopSession(session.sessionId);
+            window.removeEventListener("pagehide", handlePageHide);
+          }
           render();
         } catch (error) {
           button.disabled = false;
@@ -92,7 +110,6 @@ export async function mountStudy(root: HTMLElement, mode: Mode) {
       }));
     };
 
-    window.addEventListener("beforeunload", () => { void apiRequest(`/study/session/${session.sessionId}/stop`, { method: "POST" }); }, { once: true });
     render();
   } catch (error) {
     root.innerHTML = `<main class="study-page"><section class="study-error"><h2>学习内容加载失败</h2><p>${escapeHtml(error instanceof Error ? error.message : "请刷新页面后重试")}</p><a href="/">返回首页</a></section></main>`;
