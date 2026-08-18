@@ -1,5 +1,6 @@
 import os
-from flask import Flask, CORS, jsonify, request
+from flask import Flask, jsonify, request
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import inspect, text
 
@@ -23,20 +24,15 @@ def ensure_schema_compatibility():
             "new_attempts": "ALTER TABLE user_word_cards ADD COLUMN new_attempts INTEGER NOT NULL DEFAULT 0",
             "new_complete": "ALTER TABLE user_word_cards ADD COLUMN new_complete BOOLEAN NOT NULL DEFAULT 0",
         }
-        changed = False
         for name, statement in additions.items():
             if name not in columns:
                 db.session.execute(text(statement))
-                changed = True
         if "new_attempts" not in columns:
             db.session.execute(text("UPDATE user_word_cards SET new_attempts = MIN(3, COALESCE(new_ec_correct, 0) + COALESCE(new_ce_correct, 0))"))
-        if changed:
-            db.session.commit()
     if "daily_plans" in tables:
         columns = {column["name"] for column in inspector.get_columns("daily_plans")}
         if "mandatory_source_date" not in columns:
             db.session.execute(text("ALTER TABLE daily_plans ADD COLUMN mandatory_source_date DATE"))
-            db.session.commit()
 
 
 def _security_headers(response):
@@ -122,7 +118,12 @@ def create_app() -> Flask:
 
     with app.app_context():
         from . import models  # noqa: F401
-        db.create_all()
-        ensure_schema_compatibility()
+        try:
+            db.create_all()
+            ensure_schema_compatibility()
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
 
     return app
