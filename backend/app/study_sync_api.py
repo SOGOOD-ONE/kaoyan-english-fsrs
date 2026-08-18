@@ -8,11 +8,21 @@ from .models import ReviewLog, UserWordCard
 study_sync_api = Blueprint("study_sync_api", __name__)
 
 
+MAX_SYNC_LOOKBACK_DAYS = 365  # Only sync at most 1 year of history
+
 def parse_sync_since(value):
     if not value:
         return None
     try:
-        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00")).replace(tzinfo=None)
+        # Clamp to reasonable range: not in the future, not too far in past
+        now = datetime.utcnow()
+        earliest = now - timedelta(days=MAX_SYNC_LOOKBACK_DAYS)
+        if dt > now:
+            dt = now
+        elif dt < earliest:
+            dt = earliest
+        return dt
     except ValueError:
         return None
 
@@ -24,7 +34,9 @@ def sync_study_incremental(user):
     since = parse_sync_since(request.args.get("since"))
 
     if since is None:
-        cards = UserWordCard.query.filter_by(user_id=user.id).all()
+        # Paginated sync: limit per request
+    limit = min(int(request.args.get("limit", 500)), 2000)
+    cards = UserWordCard.query.filter_by(user_id=user.id).limit(limit).all()
         logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
     else:
         logs = ReviewLog.query.filter(
