@@ -178,3 +178,70 @@ def update_settings(user):
     db.session.add(settings)
     db.session.commit()
     return get_settings(user)
+
+
+@api.post("/reviews")
+@login_required
+def submit_review_compat(user):
+    """Compatibility write endpoint used by the client sync layer.
+
+    The current study APIs own the learning-stage decision. This endpoint only
+    persists the resulting FSRS card snapshot and review log for the account.
+    Repeated reviewId submissions are idempotent.
+    """
+    data = request.get_json(silent=True) or {}
+    review_id = str(data.get("reviewId", "")).strip()
+    word_id = str(data.get("wordId", "")).strip()
+    if not review_id or not word_id:
+        return jsonify({"error": "invalid_review"}), 400
+    if word_id not in selected_word_ids(user):
+        return jsonify({"error": "word_not_in_selected_vocabulary"}), 409
+    word = Word.query.filter_by(id=word_id).first()
+    if not word:
+        return jsonify({"error": "word_not_found"}), 404
+
+    existing = ReviewLog.query.filter_by(id=review_id, user_id=user.id).first()
+    if existing:
+        card = UserWordCard.query.filter_by(id=existing.card_id, user_id=user.id).first()
+        return jsonify({
+            "review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()},
+            "card": card_json(card) if card else None,
+            "duplicate": True,
+        })
+
+    card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
+    if not card:
+        card = UserWordCard(user_id=user.id, word_id=word_id, state="new", due_at=datetime.utcnow())
+        db.session.add(card)
+        db.session.flush()
+
+    snapshot = data.get("card") or {}
+    try:
+        card.state = str(snapshot.get("state", card.state))
+        card.stability = float(snapshot.get("stability", card.stability or 0.0))
+        card.difficulty = float(snapshot.get("difficulty", card.difficulty or 5.0))
+        card.due_at = parse_client_datetime(snapshot.get("dueAt"), card.due_at)
+        card.review_count = int(snapshot.get("reviewCount", card.review_count or 0))
+        card.wrong_count = int(snapshot.get("wrongCount", card.wrong_count or 0))
+        card.correct_count = int(snapshot.get("correctCount", card.correct_count or 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid_card"}), 400
+
+    reviewed_at = parse_client_datetime(data.get("reviewedAt"), datetime.utcnow())
+    review_type = str(data.get("reviewType", "review"))
+    rating = int(data.get("rating", 3))
+    if rating not in {1, 2, 3, 4}:
+        return jsonify({"error": "invalid_rating"}), 400
+
+    card.last_review_at = reviewed_at
+    card.first_learned_at = card.first_learned_at or reviewed_at
+    row = ReviewLog(id=review_id, user_id=user.id, word_id=word_id, card_id=card.id,
+                    rating=rating, review_type=review_type, reviewed_at=reviewed_at)
+    db.session.add(row)
+    db.session.commit()
+
+    return jsonify({
+        "review": {"id": row.id, "reviewedAt": row.reviewed_at.isoformat()},
+        "card": card_json(card),
+        "duplicate": False,
+    })
