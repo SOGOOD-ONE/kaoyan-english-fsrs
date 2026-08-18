@@ -56,13 +56,78 @@ def card_retrievability(card, now=None):
 def study_overview(user):
     word_ids = selected_word_ids(user)
     total = len(word_ids)
-    cards = UserWordCard.query.filter(UserWordCard.user_id == user.id, UserWordCard.word_id.in_(word_ids)).all() if word_ids else []
-    learned_ids = {card.word_id for card in cards if card.first_learned_at is not None or card.review_count > 0}
-    reviewed_ids = {card.word_id for card in cards if card.review_count > 1}
-    mastered_ids = {card.word_id for card in cards if card.state == "review" and card.stability >= 1.5 and card_retrievability(card) >= 0.9 and card.review_count >= 2}
-    learned, reviewed, mastered = len(learned_ids), len(reviewed_ids), len(mastered_ids)
+    if not word_ids:
+        return jsonify({
+            "totalWords": 0,
+            "learnedWords": 0,
+            "reviewedWords": 0,
+            "masteredWords": 0,
+            "remainingWords": 0,
+            "progressPercent": 0.0,
+        })
+
+    cards = UserWordCard.query.filter(
+        UserWordCard.user_id == user.id,
+        UserWordCard.word_id.in_(word_ids),
+    ).all()
+    logs = ReviewLog.query.filter(
+        ReviewLog.user_id == user.id,
+        ReviewLog.word_id.in_(word_ids),
+    ).all()
+
+    reviews_by_word = {}
+    for log in logs:
+        reviews_by_word[log.word_id] = reviews_by_word.get(log.word_id, 0) + 1
+
+    card_by_word = {card.word_id: card for card in cards}
+    learned_ids = {
+        word_id
+        for word_id, count in reviews_by_word.items()
+        if count > 0
+    }
+    learned_ids.update(
+        card.word_id
+        for card in cards
+        if card.first_learned_at is not None
+    )
+
+    reviewed_ids = {
+        word_id
+        for word_id, count in reviews_by_word.items()
+        if count >= 2
+    }
+    reviewed_ids.update(
+        card.word_id
+        for card in cards
+        if card.review_count >= 2
+    )
+
+    mastered_ids = set()
+    for word_id in reviewed_ids:
+        card = card_by_word.get(word_id)
+        if not card:
+            continue
+        if (
+            card.state == "review"
+            and card.review_count >= 2
+            and card.stability >= 1.5
+            and card_retrievability(card) >= 0.9
+            and card.correct_count >= card.wrong_count
+        ):
+            mastered_ids.add(word_id)
+
+    learned = len(learned_ids)
+    reviewed = len(reviewed_ids)
+    mastered = len(mastered_ids)
     remaining = max(0, total - learned)
-    return jsonify({"totalWords": total, "learnedWords": learned, "reviewedWords": reviewed, "masteredWords": mastered, "remainingWords": remaining, "progressPercent": round((learned / total) * 100, 1) if total else 0.0})
+    return jsonify({
+        "totalWords": total,
+        "learnedWords": learned,
+        "reviewedWords": reviewed,
+        "masteredWords": mastered,
+        "remainingWords": remaining,
+        "progressPercent": round((learned / total) * 100, 1) if total else 0.0,
+    })
 
 
 @study_plan_api.get("/study/today/progress")
@@ -109,8 +174,6 @@ def start_study_session(user):
 
     now = datetime.utcnow()
     active_sessions = StudySession.query.filter_by(user_id=user.id, ended_at=None).all()
-    # A browser refresh, another device, or a previous tab can leave an old session open.
-    # Close all existing active sessions before creating the new authoritative session.
     for active in active_sessions:
         active.ended_at = now
         active.duration_seconds = max(0, int((now - active.started_at).total_seconds()))
