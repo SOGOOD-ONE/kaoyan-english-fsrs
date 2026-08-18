@@ -108,7 +108,12 @@ class UserWordCard(db.Model):
     new_ce_correct = db.Column(db.Integer, nullable=False, default=0)
     new_attempts = db.Column(db.Integer, nullable=False, default=0)
     new_complete = db.Column(db.Boolean, nullable=False, default=False)
-    __table_args__ = (db.UniqueConstraint('user_id', 'word_id', name='uq_user_word_card'),)
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'word_id', name='uq_user_word_card'),
+        db.Index("idx_uwc_due_at", "due_at"),
+        db.Index("idx_uwc_state", "state"),
+        db.Index("idx_uwc_user_state", "user_id", "state"),
+    )
 
 
 class ReviewLog(db.Model):
@@ -158,4 +163,7 @@ class DailyPlan(db.Model):
     mandatory_source_date = db.Column(db.Date)
     self_total = db.Column(db.Integer, nullable=False, default=0)
     self_completed = db.Column(db.Integer, nullable=False, default=0)
-    __table_args__ = (db.UniqueConstraint('user_id', 'plan_date', name='uq_user_plan_date'),)
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'plan_date', name='uq_user_plan_date'),
+        db.Index("idx_dp_plan_date", "plan_date"),
+    )
