@@ -25,8 +25,14 @@ export async function mountDashboard(root: HTMLElement) {
   root.innerHTML = `<div class="dashboard-shell"><div class="dashboard-loading">正在加载你的学习数据…</div></div>`;
   try {
     const { overview, time, today, activeDays, user } = await loadDashboard();
-    const reviewRequired = (today.reviewRemaining ?? (today.mandatoryTotal - today.mandatoryCompleted)) > 0;
     const reviewRemaining = Math.max(0, today.reviewRemaining ?? (today.mandatoryTotal - today.mandatoryCompleted));
+    const reviewRequired = reviewRemaining > 0;
+    const reviewTotal = today.mandatoryTotal;
+    const reviewCompleted = Math.min(today.mandatoryCompleted, reviewTotal);
+    const newCompleted = Math.min(today.newCompleted, today.newQuota);
+    const newRemaining = Math.max(0, today.newQuota - newCompleted);
+    const reviewLabel = reviewTotal > 0 ? `${reviewCompleted}/${reviewTotal}` : "今日已完成";
+    const newLabel = reviewRequired ? "完成今日复习后解锁" : newRemaining > 0 ? `剩余 ${newRemaining} 个` : "今日新词已完成";
     root.innerHTML = `
       <div class="dashboard-shell">
         <header class="dashboard-header">
@@ -43,12 +49,12 @@ export async function mountDashboard(root: HTMLElement) {
           </section>
           <section class="dashboard-time-grid"><div class="dashboard-time-card"><span>今日学习时长</span><strong>${formatDuration(time.todaySeconds)}</strong></div><div class="dashboard-time-card"><span>总学习时长</span><strong>${formatDuration(time.totalSeconds)}</strong></div><div class="dashboard-time-card"><span>活跃天数</span><strong>${activeDays}</strong></div></section>
           <section class="dashboard-actions">
-            <a class="study-action review-required" href="/study/review"><span class="study-action-title">${reviewRequired ? "先完成今日复习" : "开始复习"}</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项今日必做复习` : "今日必做复习已经完成"}</span><span class="study-action-arrow">→</span></a>
+            <a class="study-action review-required" href="/study/review"><span class="study-action-title">${reviewRequired ? "先完成今日复习" : "开始复习"}</span><span class="study-action-desc">${reviewRequired ? `还有 ${reviewRemaining} 项 · 已完成 ${reviewLabel}` : reviewLabel}</span><span class="study-action-arrow">→</span></a>
             <div class="study-action ${reviewRequired ? "locked" : ""}" ${reviewRequired ? `aria-disabled="true" data-locked="1"` : ""}>
               <span class="study-action-title">学习新词</span>
-              <span class="study-action-desc">${reviewRequired ? "完成今日复习后解锁" : `今天可学习 ${today.newQuota} 个新词`}</span>
-              <span class="study-action-arrow">${reviewRequired ? "🔒" : "→"}</span>
-              ${reviewRequired ? "" : `<a class="study-action-cover" href="/study/new" aria-label="开始学习新词"></a>`}
+              <span class="study-action-desc">${newLabel} · ${newCompleted}/${today.newQuota}</span>
+              <span class="study-action-arrow">${reviewRequired ? "🔒" : newRemaining > 0 ? "→" : "✓"}</span>
+              ${reviewRequired || newRemaining === 0 ? "" : `<a class="study-action-cover" href="/study/new" aria-label="开始学习新词"></a>`}
             </div>
             <a class="study-action" href="/study/self"><span class="study-action-title">自主复习</span><span class="study-action-desc">按照 FSRS 当前到期状态复习已经学习过的单词</span><span class="study-action-arrow">→</span></a>
           </section>
