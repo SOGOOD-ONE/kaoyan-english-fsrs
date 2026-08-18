@@ -1,26 +1,21 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
-from .models import ReviewLog, UserSetting
-
-
-def user_zone(user_id):
-    settings = UserSetting.query.filter_by(user_id=user_id).first()
-    try:
-        return ZoneInfo(settings.timezone if settings and settings.timezone else "Asia/Shanghai")
-    except Exception:
-        return ZoneInfo("Asia/Shanghai")
+from .models import ReviewLog
+from .timezone_utils import local_day_start_utc, local_now, user_timezone
 
 
 def build_history(user_id, days=30):
-    zone = user_zone(user_id)
-    local_now = datetime.now(timezone.utc).astimezone(zone)
-    local_today = local_now.date()
+    from .models import User
+    user = User.query.filter_by(id=user_id).first()
+    if not user:
+        return {"days": [], "streak": 0, "totalReviews": 0, "activeDays": 0}
+
+    zone = user_timezone(user)
+    local_today = local_now(user).date()
     start_day = local_today - timedelta(days=max(1, min(days, 365)) - 1)
-    local_start = datetime.combine(start_day, datetime.min.time(), tzinfo=zone)
-    start = local_start.astimezone(timezone.utc).replace(tzinfo=None)
-    end = datetime.utcnow()
+    start = local_day_start_utc(user, start_day)
+    end = datetime.now(timezone.utc).replace(tzinfo=None)
     logs = ReviewLog.query.filter(
         ReviewLog.user_id == user_id,
         ReviewLog.reviewed_at >= start,
