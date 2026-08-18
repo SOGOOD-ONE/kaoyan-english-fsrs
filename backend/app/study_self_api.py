@@ -32,6 +32,7 @@ def self_queue(user):
     cards = UserWordCard.query.filter(
         UserWordCard.user_id == user.id,
         UserWordCard.word_id.in_(selected_ids),
+        UserWordCard.known_excluded.is_(False),
         UserWordCard.review_count > 0,
     ).order_by(
         UserWordCard.due_at.asc(),
