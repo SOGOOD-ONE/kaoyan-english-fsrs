@@ -6,7 +6,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import db
 from .models import DailyPlan, ReviewLog, User, UserSetting, UserVocabulary, UserWordCard, Vocabulary, VocabularyWord, Word
-from .time_utils import local_day_start_utc, local_today, local_now
+from .time_utils import local_day_start_utc, local_today, local_now, DEFAULT_TIMEZONE
 
 api = Blueprint("api", __name__)
 
@@ -103,7 +103,7 @@ def register():
     user = User(email=email, password_hash=generate_password_hash(password), nickname=nickname)
     db.session.add(user)
     db.session.flush()
-    db.session.add(UserSetting(user_id=user.id))
+    db.session.add(UserSetting(user_id=user.id, timezone=DEFAULT_TIMEZONE))
     core = Vocabulary.query.filter_by(name="考研英语核心词", kind="system").first()
     if core:
         existing = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=core.id).first()
@@ -145,10 +145,12 @@ def me():
 def get_settings(user):
     settings = UserSetting.query.filter_by(user_id=user.id).first()
     if not settings:
-        settings = UserSetting(user_id=user.id)
+        settings = UserSetting(user_id=user.id, timezone=DEFAULT_TIMEZONE)
         db.session.add(settings)
-        db.session.commit()
-    return jsonify({"dailyNewQuota": settings.daily_new_quota, "timezone": settings.timezone,
+    elif settings.timezone != DEFAULT_TIMEZONE:
+        settings.timezone = DEFAULT_TIMEZONE
+    db.session.commit()
+    return jsonify({"dailyNewQuota": settings.daily_new_quota,
                     "soundEnabled": settings.sound_enabled, "autoPlayExample": settings.auto_play_example})
 
 
@@ -156,7 +158,7 @@ def get_settings(user):
 @login_required
 def update_settings(user):
     data = request.get_json(silent=True) or {}
-    settings = UserSetting.query.filter_by(user_id=user.id).first() or UserSetting(user_id=user.id)
+    settings = UserSetting.query.filter_by(user_id=user.id).first() or UserSetting(user_id=user.id, timezone=DEFAULT_TIMEZONE)
     if "dailyNewQuota" in data:
         try:
             quota = int(data["dailyNewQuota"])
@@ -168,8 +170,7 @@ def update_settings(user):
         plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=local_today(user)).first()
         if plan:
             plan.new_quota = quota
-    if "timezone" in data:
-        settings.timezone = str(data["timezone"])
+    settings.timezone = DEFAULT_TIMEZONE
     if "soundEnabled" in data:
         settings.sound_enabled = bool(data["soundEnabled"])
     if "autoPlayExample" in data:
@@ -177,242 +178,3 @@ def update_settings(user):
     db.session.add(settings)
     db.session.commit()
     return get_settings(user)
-
-
-@api.get("/cards")
-@login_required
-def cards(user):
-    return jsonify([card_json(row) for row in UserWordCard.query.filter_by(user_id=user.id).all()])
-
-
-@api.put("/cards/<word_id>")
-@login_required
-def upsert_card(user, word_id):
-    data = request.get_json(silent=True) or {}
-    card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
-    if not card:
-        if not Word.query.filter_by(id=word_id).first():
-            return jsonify({"error": "word_not_found"}), 404
-        card = UserWordCard(user_id=user.id, word_id=word_id)
-        db.session.add(card)
-    mapping = {"state": "state", "stability": "stability", "difficulty": "difficulty",
-               "correctCount": "correct_count", "wrongCount": "wrong_count", "reviewCount": "review_count"}
-    for key, attr in mapping.items():
-        if key in data:
-            setattr(card, attr, data[key])
-    if "dueAt" in data:
-        card.due_at = parse_client_datetime(data["dueAt"])
-    if "lastReviewAt" in data:
-        card.last_review_at = parse_client_datetime(data["lastReviewAt"])
-    db.session.commit()
-    return jsonify(card_json(card))
-
-
-@api.get("/sync/study")
-@login_required
-def sync_study(user):
-    since = parse_sync_since(request.args.get("since"))
-    if since is None:
-        cards = UserWordCard.query.filter_by(user_id=user.id).all()
-        logs = ReviewLog.query.filter_by(user_id=user.id).order_by(ReviewLog.reviewed_at.asc()).all()
-    else:
-        logs = ReviewLog.query.filter(
-            ReviewLog.user_id == user.id,
-            ReviewLog.reviewed_at > since,
-        ).order_by(ReviewLog.reviewed_at.asc()).all()
-        changed_word_ids = {row.word_id for row in logs}
-        changed_word_ids.update(
-            row.word_id for row in UserWordCard.query.filter(
-                UserWordCard.user_id == user.id,
-                UserWordCard.last_review_at.isnot(None),
-                UserWordCard.last_review_at > since,
-            ).all()
-        )
-        cards = UserWordCard.query.filter(
-            UserWordCard.user_id == user.id,
-            UserWordCard.word_id.in_(changed_word_ids),
-        ).all() if changed_word_ids else []
-
-    server_now = datetime.utcnow()
-    return jsonify({
-        "cards": [card_json(c) for c in cards],
-        "reviews": [{"id": r.id, "wordId": r.word_id, "rating": r.rating,
-                     "reviewedAt": r.reviewed_at.isoformat(), "reviewType": r.review_type} for r in logs],
-        "serverNow": server_now.isoformat(),
-    })
-
-
-@api.get("/words")
-@login_required
-def words(user):
-    query = Word.query
-    args = request.args
-    vocabulary_id = args.get("vocabularyId")
-    if vocabulary_id:
-        if not vocabulary_is_visible(user, vocabulary_id):
-            return jsonify({"error": "not_found"}), 404
-        query = query.join(VocabularyWord, VocabularyWord.word_id == Word.id).filter(VocabularyWord.vocabulary_id == vocabulary_id)
-    elif args.get("selectedOnly", "1") != "0":
-        ids = selected_word_ids(user)
-        if not ids:
-            return jsonify([])
-        query = query.filter(Word.id.in_(ids))
-    if args.get("q"):
-        query = query.filter(Word.normalized_word.like(f"%{normalize_word(args['q'])}%"))
-    if args.get("category"):
-        query = query.filter_by(category=args["category"])
-    if args.get("source"):
-        query = query.filter_by(source=args["source"])
-    rows = query.order_by(Word.category.asc(), Word.created_at.asc()).limit(min(int(args.get("limit", 100)), 500)).all()
-    return jsonify([{"id": w.id, "word": w.word, "type": w.word_type, "meaning": w.meaning,
-                     "category": w.category, "source": w.source, "sourceDetail": w.source_detail} for w in rows])
-
-
-@api.get("/study/today")
-@login_required
-def study_today(user):
-    today = local_today(user)
-    settings = UserSetting.query.filter_by(user_id=user.id).first() or UserSetting(user_id=user.id)
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
-
-    selected_ids = selected_word_ids(user)
-    due_query = UserWordCard.query.filter(UserWordCard.user_id == user.id,
-                                          UserWordCard.due_at <= datetime.utcnow(),
-                                          UserWordCard.state != "new")
-    if selected_ids:
-        due_query = due_query.filter(UserWordCard.word_id.in_(selected_ids))
-    else:
-        due_query = due_query.filter(False)
-    due = due_query.order_by(UserWordCard.due_at.asc()).all()
-
-    if not plan:
-        plan = DailyPlan(user_id=user.id, plan_date=today, new_quota=settings.daily_new_quota,
-                         mandatory_total=len(due), mandatory_completed=0)
-        db.session.add(plan)
-    elif plan.mandatory_total == 0 and due and plan.mandatory_completed == 0:
-        plan.mandatory_total = len(due)
-
-    active_words = {c.word_id for c in UserWordCard.query.filter_by(user_id=user.id).all()}
-    category_weight = {"核心词": 100, "长难词": 95, "难词": 90, "短语": 85, "固定搭配": 85}
-    candidate_query = Word.query.filter(Word.id.in_(selected_ids - active_words)) if selected_ids else Word.query.filter(False)
-    candidates = candidate_query.all()
-    candidates.sort(key=lambda w: (-category_weight.get(w.category, 50), w.created_at))
-    new_words = candidates[:settings.daily_new_quota]
-
-    if plan.new_quota != settings.daily_new_quota:
-        plan.new_quota = settings.daily_new_quota
-    plan.new_completed = min(plan.new_completed, len(new_words))
-
-    day_start = local_day_start_utc(user, today)
-    today_logs = ReviewLog.query.filter(ReviewLog.user_id == user.id, ReviewLog.reviewed_at >= day_start).all()
-    db.session.commit()
-
-    mandatory_remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
-    return jsonify({"date": today.isoformat(), "review": [card_json(c) for c in due],
-                    "newWords": [{"id": w.id, "word": w.word, "type": w.word_type, "meaning": w.meaning,
-                                  "category": w.category, "source": w.source} for w in new_words],
-                    "newTotal": len(new_words), "newCompleted": plan.new_completed,
-                    "reviewTotal": len(due), "reviewCompleted": len(today_logs),
-                    "mandatoryTotal": plan.mandatory_total, "mandatoryCompleted": plan.mandatory_completed,
-                    "mandatoryRemaining": mandatory_remaining, "newUnlocked": mandatory_remaining == 0,
-                    "selfCompleted": plan.self_completed})
-
-
-@api.post("/reviews")
-@login_required
-def create_review(user):
-    data = request.get_json(silent=True) or {}
-    word_id = str(data.get("wordId", ""))
-    rating = int(data.get("rating", 0))
-    review_id = str(data.get("reviewId", "")).strip()
-    review_type = str(data.get("reviewType", "review"))
-    if rating not in (1, 2, 3, 4):
-        return jsonify({"error": "invalid_rating"}), 400
-    if review_type not in {"new", "mandatory", "self", "review"}:
-        return jsonify({"error": "invalid_review_type"}), 400
-    if not word_id:
-        return jsonify({"error": "word_required"}), 400
-    if not Word.query.filter_by(id=word_id).first():
-        return jsonify({"error": "word_not_found"}), 404
-
-    if review_id:
-        existing = ReviewLog.query.filter_by(id=review_id, user_id=user.id).first()
-        if existing:
-            existing_card_row = UserWordCard.query.filter_by(id=existing.card_id, user_id=user.id).first()
-            return jsonify({"review": {"id": existing.id, "reviewedAt": existing.reviewed_at.isoformat()},
-                            "card": card_json(existing_card_row) if existing_card_row else None, "duplicate": True})
-
-    today = local_today(user)
-    plan = DailyPlan.query.filter_by(user_id=user.id, plan_date=today).first()
-    if review_type == "new" and plan:
-        mandatory_remaining = max(0, plan.mandatory_total - plan.mandatory_completed)
-        if mandatory_remaining > 0:
-            return jsonify({"error": "mandatory_review_required", "remaining": mandatory_remaining}), 409
-        if plan.new_completed >= plan.new_quota:
-            return jsonify({"error": "daily_new_quota_reached", "quota": plan.new_quota}), 409
-
-    reviewed_at = parse_client_datetime(data.get("reviewedAt"))
-    card_payload = data.get("card") if isinstance(data.get("card"), dict) else {}
-    card = UserWordCard.query.filter_by(user_id=user.id, word_id=word_id).first()
-    if not card:
-        card = UserWordCard(user_id=user.id, word_id=word_id, first_learned_at=reviewed_at)
-        db.session.add(card)
-        db.session.flush()
-
-    previous_review_count = card.review_count
-    card.review_count = int(card_payload.get("reviewCount", previous_review_count + 1))
-    card.correct_count = int(card_payload.get("correctCount", card.correct_count + (0 if rating == 1 else 1)))
-    card.wrong_count = int(card_payload.get("wrongCount", card.wrong_count + (1 if rating == 1 else 0)))
-    card.state = str(card_payload.get("state", card.state))
-    card.stability = float(card_payload.get("stability", card.stability))
-    card.difficulty = float(card_payload.get("difficulty", card.difficulty))
-    card.due_at = parse_client_datetime(card_payload.get("dueAt"), reviewed_at)
-    card.last_review_at = reviewed_at
-    if not card.first_learned_at:
-        card.first_learned_at = reviewed_at
-
-    log = ReviewLog(id=review_id or None, user_id=user.id, word_id=word_id, card_id=card.id,
-                    rating=rating, review_type=review_type, reviewed_at=reviewed_at,
-                    elapsed_seconds=data.get("elapsedSeconds"))
-    db.session.add(log)
-
-    if not plan:
-        settings = UserSetting.query.filter_by(user_id=user.id).first() or UserSetting(user_id=user.id)
-        plan = DailyPlan(user_id=user.id, plan_date=today, new_quota=settings.daily_new_quota)
-        db.session.add(plan)
-    if review_type == "new":
-        plan.new_completed += 1
-    elif review_type == "mandatory":
-        plan.mandatory_completed = min(plan.mandatory_total, plan.mandatory_completed + 1)
-    elif review_type == "self":
-        plan.self_completed += 1
-    db.session.commit()
-    return jsonify({"review": {"id": log.id, "reviewedAt": reviewed_at.isoformat()}, "card": card_json(card)})
-
-
-@api.get("/vocabularies")
-@login_required
-def vocabularies(user):
-    rows = Vocabulary.query.filter(visible_vocabulary_filter(user)).order_by(Vocabulary.priority.desc()).all()
-    enabled_ids = enabled_vocabulary_ids(user)
-    return jsonify([{"id": r.id, "name": r.name, "kind": r.kind, "priority": r.priority,
-                     "description": r.description, "ownerUserId": r.owner_user_id,
-                     "enabled": r.id in enabled_ids, "createdAt": r.created_at.isoformat()} for r in rows])
-
-
-@api.put("/vocabularies/<vocabulary_id>/selection")
-@login_required
-def set_vocabulary_selection(user, vocabulary_id):
-    vocabulary = vocabulary_is_visible(user, vocabulary_id)
-    if not vocabulary:
-        return jsonify({"error": "not_found"}), 404
-    data = request.get_json(silent=True) or {}
-    enabled = bool(data.get("enabled", True))
-    row = UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary_id).first()
-    if not row:
-        row = UserVocabulary(user_id=user.id, vocabulary_id=vocabulary_id, enabled=enabled, priority=vocabulary.priority)
-        db.session.add(row)
-    else:
-        row.enabled = enabled
-    db.session.commit()
-    return jsonify({"vocabularyId": vocabulary_id, "enabled": row.enabled})
