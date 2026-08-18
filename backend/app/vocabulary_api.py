@@ -80,6 +80,20 @@ def replace_selections(user):
     refresh_unstarted_daily_plan(user)
     db.session.commit(); return selections(user)
 
+@vocabulary_api.delete("/vocabularies/<vocabulary_id>")
+@login_required
+def delete_vocabulary(user, vocabulary_id):
+    vocabulary = Vocabulary.query.filter_by(id=vocabulary_id, kind="user", owner_user_id=user.id).first()
+    if not vocabulary:
+        return jsonify({"error": "not_found"}), 404
+
+    UserVocabulary.query.filter_by(user_id=user.id, vocabulary_id=vocabulary_id).delete(synchronize_session=False)
+    VocabularyWord.query.filter_by(vocabulary_id=vocabulary_id).delete(synchronize_session=False)
+    db.session.delete(vocabulary)
+    refresh_unstarted_daily_plan(user)
+    db.session.commit()
+    return jsonify({"ok": True, "vocabularyId": vocabulary_id, "name": vocabulary.name})
+
 @vocabulary_api.post("/vocabularies/import")
 @login_required
 def import_user_vocabulary(user):

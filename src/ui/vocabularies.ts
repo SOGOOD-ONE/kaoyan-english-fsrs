@@ -18,8 +18,23 @@ async function renderList(container: HTMLElement) {
       apiRequest<Record<string, Stats>>("/vocabularies/stats").catch(() => ({} as Record<string, Stats>)),
     ]);
     const selected = new Map(selections.map(item => [item.vocabularyId, item]));
-    container.innerHTML = `<div class="vocab-page-head"><div><strong>词库</strong><span>${vocabularies.length} 个可用词库</span></div><label class="button">导入词表<input id="vocab-import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div><div class="vocab-page-list">${vocabularies.map(v => { const s = statsMap[v.id] || { wordCount: 0, learned: 0, due: 0, new: 0, masteryRate: 0 }; const enabled = selected.get(v.id)?.enabled ?? false; return `<article class="vocab-page-item"><div class="vocab-page-main"><label><input type="checkbox" data-select="${v.id}" ${enabled ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><p>${escapeHtml(v.description || "系统词库")}</p><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>${s.wordCount} 词 · 已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><div class="vocab-page-rate">${s.masteryRate}%</div></article>`; }).join("") || `<div class="empty"><h2>还没有词库</h2><p>导入第一份词表开始学习。</p></div>`}</div>`;
+    container.innerHTML = `<div class="vocab-page-head"><div><strong>词库</strong><span>${vocabularies.length} 个可用词库</span></div><label class="button">导入词表<input id="vocab-import" type="file" accept=".xlsx,.xls,.csv,.json" hidden></label></div><div class="vocab-page-list">${vocabularies.map(v => { const s = statsMap[v.id] || { wordCount: 0, learned: 0, due: 0, new: 0, masteryRate: 0 }; const enabled = selected.get(v.id)?.enabled ?? false; const deletable = v.kind === "user"; return `<article class="vocab-page-item"><div class="vocab-page-main"><label><input type="checkbox" data-select="${v.id}" ${enabled ? "checked" : ""}><strong>${escapeHtml(v.name)}</strong></label><p>${escapeHtml(v.description || "系统词库")}</p><div class="vocab-progress"><span style="width:${Math.min(100, s.masteryRate)}%"></span></div><small>${s.wordCount} 词 · 已学 ${s.learned} · 待复习 ${s.due} · 未学 ${s.new}</small></div><div class="vocab-page-side" style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;min-width:92px"><div class="vocab-page-rate">${s.masteryRate}%</div><button class="button" data-delete="${v.id}" ${deletable ? "" : "disabled title=\"系统词库不能删除\""}>删除</button></div></article>`; }).join("") || `<div class="empty"><h2>还没有词库</h2><p>导入第一份词表开始学习。</p></div>`}</div>`;
     container.querySelectorAll<HTMLInputElement>("[data-select]").forEach(input => input.addEventListener("change", async () => { try { await apiRequest(`/vocabularies/${input.dataset.select}/selection`, { method: "PUT", body: JSON.stringify({ enabled: input.checked }) }); await renderList(container); } catch { input.checked = !input.checked; } }));
+    container.querySelectorAll<HTMLButtonElement>("[data-delete]").forEach(button => button.addEventListener("click", async () => {
+      const vocabularyId = button.dataset.delete;
+      if (!vocabularyId) return;
+      if (button.disabled) return;
+      const vocabularyName = button.closest(".vocab-page-item")?.querySelector("strong")?.textContent?.trim() || "这个词库";
+      if (!window.confirm(`确定删除“${vocabularyName}”吗？删除后词库本身会移除，学习记录会保留。`)) return;
+      button.disabled = true;
+      try {
+        await apiRequest(`/vocabularies/${encodeURIComponent(vocabularyId)}`, { method: "DELETE" });
+        await renderList(container);
+      } catch (error) {
+        button.disabled = false;
+        alert(error instanceof Error ? error.message : "删除失败");
+      }
+    }));
     container.querySelector<HTMLInputElement>("#vocab-import")?.addEventListener("change", async e => {
       const input = e.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return;
       try {

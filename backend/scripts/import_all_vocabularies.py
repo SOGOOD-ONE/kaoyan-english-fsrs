@@ -1,7 +1,10 @@
 """Import all supported vocabulary workbooks from the repository data directory."""
 from pathlib import Path
 
-from import_vocabulary import import_workbook
+try:
+    from scripts.import_vocabulary import import_workbook
+except ImportError:  # pragma: no cover - fallback for direct script execution
+    from import_vocabulary import import_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
 VOCAB_DIR = ROOT / "data" / "vocabulary"

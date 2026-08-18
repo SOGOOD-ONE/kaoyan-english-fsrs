@@ -8,7 +8,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from import_vocabulary import import_workbook
+try:
+    from scripts.import_vocabulary import import_workbook
+except ImportError:  # pragma: no cover - fallback for direct script execution
+    from import_vocabulary import import_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
 
