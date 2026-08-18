@@ -11,6 +11,7 @@ type ServerCard = { id: string; wordId: string; state: string; stability: number
 type TodayProgress = { mandatoryTotal: number; mandatoryCompleted: number; reviewRemaining?: number; newQuota: number; newCompleted: number };
 type NewQueue = { newUnlocked: boolean; mandatoryRemaining: number; quota: number; completed: number; words: ServerWord[] };
 type ReviewQueue = { quota: number; completed: number; remaining: number; words: Array<ServerWord & { card: ServerCard }> };
+type SelfQueue = { total: number; words: Array<ServerWord & { card: ServerCard }> };
 type Item = { word: ServerWord; card?: ServerCard };
 
 function escapeHtml(value: string) {
@@ -30,17 +31,8 @@ async function loadItems(mode: Mode): Promise<{ items: Item[]; total: number }> 
   }
 
   await syncStudyData().catch(() => undefined);
-  const words = await apiRequest<ServerWord[]>("/words?selectedOnly=1&limit=500");
-  const byId = new Map(words.map(word => [word.id, word]));
-  const cards = await apiRequest<ServerCard[]>("/cards");
-  const learned = cards
-    .filter(card => card.reviewCount > 0 && byId.has(card.wordId))
-    .sort((a, b) => {
-      const dueDelta = new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
-      if (dueDelta !== 0) return dueDelta;
-      return new Date(b.lastReviewAt || 0).getTime() - new Date(a.lastReviewAt || 0).getTime();
-    });
-  const items = learned.map(card => ({ word: byId.get(card.wordId)!, card }));
+  const queue = await apiRequest<SelfQueue>("/study/self-queue");
+  const items = queue.words.map(entry => ({ word: entry, card: entry.card }));
   return { items, total: items.length };
 }
 
